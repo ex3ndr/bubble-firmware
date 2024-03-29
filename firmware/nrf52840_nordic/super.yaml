@@ -1,7 +1,7 @@
-sample:
+super:
   name: Blinky Sample
 tests:
-  sample.basic.blinky:
+  super.basic.blinky:
     tags:
       - LED
       - gpio

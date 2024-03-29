@@ -67,6 +67,12 @@ void setup() {
   while (!Serial) {
     delay(10);
   }
+
+  Serial.println(PIN_PDM_DIN);
+  Serial.println(PIN_PDM_CLK);
+  Serial.println(PIN_PDM_PWR);
+  
+
   // Serial.println(freeMemory());
 
   // Enable microphone

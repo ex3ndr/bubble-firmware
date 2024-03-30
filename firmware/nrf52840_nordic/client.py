@@ -15,10 +15,10 @@ SERVICE_UUID = "19B10000-E8F2-537E-4F6C-D104768A1214"
 CHARACTERISTIC_UUID = "19B10001-E8F2-537E-4F6C-D104768A1214"
 
 CODEC = "pcm"  # "pcm" or "mulaw" 
-SAMPLE_RATE = 8000  # Sample rate for the audio
+SAMPLE_RATE = 16000  # Sample rate for the audio
 SAMPLE_WIDTH = 2  # 16-bit audio
 CHANNELS = 1  # Mono audio
-CAPTURE_TIME = 2  # Time to capture audio in seconds
+CAPTURE_TIME = 10  # Time to capture audio in seconds
 
 def ulaw2linear(ulaw_byte):
     """Convert a µ-law byte to a 16-bit linear PCM value."""
@@ -76,8 +76,8 @@ async def main():
             audio_data = np.frombuffer(audio_data, dtype=np.int16)
 
         if CODEC == "pcm":
-            audio_data = np.frombuffer(audio_data, dtype=np.int16)
             audio_data = audio_data[:len(audio_data) - len(audio_data) % 2]
+            audio_data = np.frombuffer(audio_data, dtype=np.int16)
         
         # Normalize
         scaling_factor = 2*32768 / (max(0, np.max(audio_data)) - min(0, np.min(audio_data)))

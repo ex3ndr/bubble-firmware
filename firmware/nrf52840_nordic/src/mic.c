@@ -71,7 +71,7 @@ int mic_start()
     pdm_config.clock_freq = NRF_PDM_FREQ_1280K;
     pdm_config.mode = NRF_PDM_MODE_MONO;
     pdm_config.edge = NRF_PDM_EDGE_LEFTFALLING;
-    pdm_config.ratio = NRF_PDM_RATIO_64X;
+    pdm_config.ratio = NRF_PDM_RATIO_80X;
     IRQ_DIRECT_CONNECT(PDM_IRQn, 5, nrfx_pdm_irq_handler, 0); // IMPORTANT!
     if (nrfx_pdm_init(&pdm_config, pdm_irq_handler) != NRFX_SUCCESS)
     {

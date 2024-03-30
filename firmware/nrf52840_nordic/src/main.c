@@ -17,6 +17,14 @@ static void mic_handler(int16_t *buffer)
 	codec_receive_pcm(buffer, MIC_BUFFER_SAMPLES); // Errors are logged inside
 }
 
+void bt_ctlr_assert_handle(char *name, int type)
+{
+	if (name != NULL)
+	{
+		printk("Bt assert-> %s", name);
+	}
+}
+
 // Main loop
 int main(void)
 {

@@ -268,7 +268,7 @@ int broadcast_audio_packets(uint8_t *buffer, size_t size)
     int written = ring_buf_put(&ring_buf, buffer, size);
     if (written != size)
     {
-        printk("Failed to write to network ring buffer, written: %d, size: %d\n", written, size);
+        // printk("Failed to write to network ring buffer, written: %d, size: %d\n", written, size);
         return -1;
     }
     return 0;

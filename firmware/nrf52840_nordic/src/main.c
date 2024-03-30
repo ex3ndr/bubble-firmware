@@ -5,17 +5,16 @@
 #include "led.h"
 #include "config.h"
 #include "audio.h"
+#include "codec.h"
 
-// Mic callback
-uint8_t mic_encoded[AUDIO_BUFFER_SAMPLES];
-#define DIVIDER 4
-static void mic_callback(int16_t *buffer)
+static void codec_handler(uint8_t *data, size_t len)
 {
-	for (int i = 0; i < MIC_BUFFER_SAMPLES / DIVIDER; i++)
-	{
-		mic_encoded[i] = linear2ulaw(buffer[i * DIVIDER]);
-	}
-	broadcast_audio_packets(mic_encoded, MIC_BUFFER_SAMPLES);
+	broadcast_audio_packets(data, len); // Errors are logged inside
+}
+
+static void mic_handler(int16_t *buffer)
+{
+	codec_receive_pcm(buffer, MIC_BUFFER_SAMPLES); // Errors are logged inside
 }
 
 // Main loop
@@ -27,8 +26,12 @@ int main(void)
 	// Led start
 	ASSERT_OK(led_start());
 
+	// Codec start
+	set_codec_callback(codec_handler);
+	ASSERT_OK(codec_start());
+
 	// Mic start
-	set_mic_callback(mic_callback);
+	set_mic_callback(mic_handler);
 	ASSERT_OK(mic_start());
 
 	// Blink LED

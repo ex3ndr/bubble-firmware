@@ -14,7 +14,7 @@ DEVICE_NAME = "Super"
 SERVICE_UUID = "19B10000-E8F2-537E-4F6C-D104768A1214"
 CHARACTERISTIC_UUID = "19B10001-E8F2-537E-4F6C-D104768A1214"
 
-SAMPLE_RATE = 8000  # Sample rate for the audio
+SAMPLE_RATE = 16000  # Sample rate for the audio
 SAMPLE_WIDTH = 2  # 16-bit audio
 CHANNELS = 1  # Mono audio
 CAPTURE_TIME = 2  # Time to capture audio in seconds
@@ -83,9 +83,9 @@ async def main():
         recordings_dir = "recordings"
         if not os.path.exists(recordings_dir):
             os.makedirs(recordings_dir)
-        # filename = os.path.join(recordings_dir, datetime.now().strftime("%H-%M-%S-%f") + file_extension)
-        # print(filename)
-        filename = os.path.join(recordings_dir, "recording" + file_extension)
+        filename = os.path.join(recordings_dir, datetime.now().strftime("%H-%M-%S-%f") + file_extension)
+        print(filename)
+        # filename = os.path.join(recordings_dir, "recording" + file_extension)
         if file_extension == ".txt":
             with open(filename, "w") as file:
                 file.write(str(list(raw_file)))
@@ -118,8 +118,8 @@ async def main():
         # end_signal = b"\xFF"
 
         def handle_audio_data(sender, data):
-            print("---handle_audio_data---")
-            print(f"Received {len(data)} bytes at {time.time()}")
+            # print("---handle_audio_data---")
+            # print(f"Received {len(data)} bytes at {time.time()}")
             audio_data.extend(data)
             # if data == [end_signal]:
             #     print(f"End signal received after {len(audio_data)} bytes")

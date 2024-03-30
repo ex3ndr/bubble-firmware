@@ -138,20 +138,30 @@ void pusher(void)
 
         // Load current connection
         struct bt_conn *conn = current_connection;
-
-        if (current_mtu < MINIMAL_PACKET_SIZE || !conn)
+        bool valid = true;
+        if (current_mtu < MINIMAL_PACKET_SIZE)
         {
-            read_size = ring_buf_get(&ring_buf, pusher_temp_data, sizeof(pusher_temp_data)); // Just discard data
-            if (read_size <= 0)
-            {
-                k_sleep(K_MSEC(1));
-            }
-            else
-            {
-                printk("Discarded %d, current MTU: %d\n", read_size, current_mtu);
-            }
+            valid = false;
+        }
+        else if (!conn)
+        {
+            valid = false;
+        }
+        else
+        {
+            valid = bt_gatt_is_subscribed(conn, &audio_service.attrs[1], BT_GATT_CCC_NOTIFY); // Check if subscribed
+        }
 
-            // bt_conn_unref(conn);
+        if (!valid)
+        {
+
+#ifdef LOG_DISCARDED
+            printk("Discarded %d, current MTU: %d\n", ring_buf_size_get(&ring_buf), current_mtu);
+#endif
+
+            // Just discard data
+            ring_buf_reset(&ring_buf);
+            k_sleep(K_MSEC(10));
             continue;
         }
 
@@ -159,7 +169,7 @@ void pusher(void)
         read_size = ring_buf_get(&ring_buf, pusher_temp_data, current_mtu);
         if (read_size <= 0) // Should not happen, but anyway
         {
-            k_sleep(K_MSEC(10));
+            k_sleep(K_MSEC(50));
             continue;
         }
 
@@ -168,7 +178,7 @@ void pusher(void)
         {
 
             // Try send notification
-            // printk("Sending %d bytes\n", read_size);
+            // printk("Sending %d bytes, wq: %d\n", read_size, sys_dlist_len(&k_sys_work_q.notifyq.waitq));
             int err = bt_gatt_notify(conn, &audio_service.attrs[1], pusher_temp_data, read_size);
 
             // Log failure
@@ -176,7 +186,7 @@ void pusher(void)
             {
                 printk("bt_gatt_notify failed (err %d)\n", err);
                 printk("MTU: %d, read_size: %d\n", current_mtu, read_size);
-                k_sleep(K_MSEC(10));
+                k_sleep(K_MSEC(50));
             }
             else
             {
@@ -230,7 +240,7 @@ int transport_start()
 
     // Start pusher
     ring_buf_init(&ring_buf, sizeof(ring_buffer_data), ring_buffer_data);
-    k_thread_create(&pusher_thread, pusher_stack, K_THREAD_STACK_SIZEOF(pusher_stack), (k_thread_entry_t)pusher, NULL, NULL, NULL, K_PRIO_COOP(7), 0, K_NO_WAIT);
+    k_thread_create(&pusher_thread, pusher_stack, K_THREAD_STACK_SIZEOF(pusher_stack), (k_thread_entry_t)pusher, NULL, NULL, NULL, K_PRIO_PREEMPT(7), 0, K_NO_WAIT);
 
     return 0;
 }

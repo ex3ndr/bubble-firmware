@@ -13,5 +13,3 @@
         printk("Error at %s:%d:%d\n", __FILE__, __LINE__, result); \
         return -1;                                                 \
     }
-
-#define NRF_GPIO_PIN_MAP(port, pin) ((port << 5) | (pin & 0x1F))

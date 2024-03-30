@@ -9,4 +9,5 @@ target_sources(app PRIVATE
     src/transport.c
     src/mic.c
     src/led.c
+    src/audio.c
 )

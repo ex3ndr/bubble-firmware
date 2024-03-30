@@ -10,14 +10,14 @@ import audioop
 import struct
 from scipy.signal import stft, istft
 
-DEVICE_ID = "EB47FC17-338E-3FA2-2C59-E88BCB047BCC" # NOTE: You will have to update this ID with your devices bluetooth id
+DEVICE_NAME = "Super"
 SERVICE_UUID = "19B10000-E8F2-537E-4F6C-D104768A1214"
 CHARACTERISTIC_UUID = "19B10001-E8F2-537E-4F6C-D104768A1214"
 
 SAMPLE_RATE = 8000  # Sample rate for the audio
 SAMPLE_WIDTH = 2  # 16-bit audio
 CHANNELS = 1  # Mono audio
-CAPTURE_TIME = 10  # Time to capture audio in seconds
+CAPTURE_TIME = 2  # Time to capture audio in seconds
 
 def ulaw2linear(ulaw_byte):
     """Convert a µ-law byte to a 16-bit linear PCM value."""
@@ -43,7 +43,7 @@ async def main():
     for device in devices:
         if device.name:
             print(device.name, device.address)
-        if device.address == DEVICE_ID:
+        if device.name == DEVICE_NAME:
             audio_recorder = device
             break
     

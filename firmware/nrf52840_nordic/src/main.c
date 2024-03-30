@@ -1,12 +1,21 @@
 #include <zephyr/kernel.h>
-#include <zephyr/bluetooth/bluetooth.h>
-#include <zephyr/bluetooth/uuid.h>
-#include <zephyr/bluetooth/gatt.h>
-#include <zephyr/drivers/gpio.h>
 #include "transport.h"
 #include "mic.h"
 #include "utils.h"
 #include "led.h"
+#include "config.h"
+#include "audio.h"
+
+// Mic callback
+uint8_t mic_encoded[AUDIO_BUFFER_SAMPLES];
+static void mic_callback(int16_t *buffer)
+{
+	for (int i = 0; i < MIC_BUFFER_SAMPLES / 2; i++)
+	{
+		mic_encoded[i] = linear2ulaw((buffer[i * 2] + buffer[i * 2 + 1]) >> 1);
+	}
+	broadcast_audio_packets(mic_encoded, MIC_BUFFER_SAMPLES);
+}
 
 // Main loop
 int main(void)
@@ -16,17 +25,16 @@ int main(void)
 
 	// Led start
 	ASSERT_OK(led_start());
-	set_led_blue(true);
-	k_msleep(1000);
 
 	// Mic start
+	set_mic_callback(mic_callback);
 	ASSERT_OK(mic_start());
-	
+
 	// Blink LED
 	bool is_on = false;
 	set_led_red(is_on);
-	set_led_blue(false);
-	while (1) {
+	while (1)
+	{
 		is_on = !is_on;
 		set_led_red(is_on);
 		k_msleep(1000);

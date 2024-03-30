@@ -1,6 +1,7 @@
 #include <zephyr/sys/ring_buffer.h>
 #include "transport.h"
 #include "config.h"
+#include "utils.h"
 
 //
 // Service and Characteristic
@@ -42,8 +43,20 @@ uint16_t current_package_index = 0;
 void _transport_connected(struct bt_conn *conn, uint8_t err)
 {
     printk("err: %d\n", err);
-    current_connection = conn;
+    struct bt_conn_info info = {0};
+    err = bt_conn_get_info(conn, &info);
+    if (err)
+    {
+        printk("Failed to get connection info (err %d)\n", err);
+        return;
+    }
+
+    current_connection = bt_conn_ref(conn);
     printk("Connected\n");
+    printk("Interval: %d, latency: %d, timeout: %d\n", info.le.interval, info.le.latency, info.le.timeout);
+    printk("TX PHY %s, RX PHY %s\n", phy2str(info.le.phy->tx_phy), phy2str(info.le.phy->rx_phy));
+    printk("LE data len updated: TX (len: %d time: %d) RX (len: %d time: %d)\n", info.le.data_len->tx_max_len, info.le.data_len->tx_max_time, info.le.data_len->rx_max_len, info.le.data_len->rx_max_time);
+
     if (transport_connected)
     {
         transport_connected(conn, err);
@@ -53,17 +66,55 @@ void _transport_connected(struct bt_conn *conn, uint8_t err)
 void _transport_disconnected(struct bt_conn *conn, uint8_t err)
 {
     printk("err: %d\n", err);
-    current_connection = NULL;
     printk("Disconnected\n");
-    if (transport_disconnected)
+    if (current_connection)
     {
-        transport_disconnected(conn, err);
+        bt_conn_unref(current_connection);
+        transport_disconnected(current_connection, err);
     }
+}
+
+static bool _le_param_req(struct bt_conn *conn, struct bt_le_conn_param *param)
+{
+    printk("Connection parameters update request received.\n");
+    printk("Minimum interval: %d, Maximum interval: %d\n",
+           param->interval_min, param->interval_max);
+    printk("Latency: %d, Timeout: %d\n", param->latency, param->timeout);
+
+    return true;
+}
+
+static void _le_param_updated(struct bt_conn *conn, uint16_t interval,
+                              uint16_t latency, uint16_t timeout)
+{
+    printk("Connection parameters updated.\n"
+           " interval: %d, latency: %d, timeout: %d\n",
+           interval, latency, timeout);
+}
+
+static void _le_phy_updated(struct bt_conn *conn,
+                            struct bt_conn_le_phy_info *param)
+{
+    printk("LE PHY updated: TX PHY %s, RX PHY %s\n",
+           phy2str(param->tx_phy), phy2str(param->rx_phy));
+}
+
+static void _le_data_length_updated(struct bt_conn *conn,
+                                    struct bt_conn_le_data_len_info *info)
+{
+    printk("LE data len updated: TX (len: %d time: %d)"
+           " RX (len: %d time: %d)\n",
+           info->tx_max_len,
+           info->tx_max_time, info->rx_max_len, info->rx_max_time);
 }
 
 static struct bt_conn_cb _callback_references = {
     .connected = _transport_connected,
     .disconnected = _transport_disconnected,
+    .le_param_req = _le_param_req,
+    .le_param_updated = _le_param_updated,
+    .le_phy_updated = _le_phy_updated,
+    .le_data_len_updated = _le_data_length_updated,
 };
 
 //
@@ -98,19 +149,20 @@ void pusher(void)
                 // Skip if no connection
                 if (!conn)
                 {
+                    // printk("No connection\n");
                     break;
                 }
 
                 // Send notification
                 int err = bt_gatt_notify(conn, &audio_service.attrs[1], data, read_size);
+                if (err)
+                {
+                    printk("bt_gatt_notify failed (err %d)\n", err);
+                }
                 if (err == -EAGAIN || err == -ENOMEM)
                 {
                     k_sleep(K_MSEC(1));
                     continue;
-                }
-                if (err)
-                {
-                    printk("bt_gatt_notify failed (err %d)\n", err);
                 }
                 break;
             }

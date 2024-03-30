@@ -8,11 +8,12 @@
 
 // Mic callback
 uint8_t mic_encoded[AUDIO_BUFFER_SAMPLES];
+#define DIVIDER 4
 static void mic_callback(int16_t *buffer)
 {
-	for (int i = 0; i < MIC_BUFFER_SAMPLES / 2; i++)
+	for (int i = 0; i < MIC_BUFFER_SAMPLES / DIVIDER; i++)
 	{
-		mic_encoded[i] = linear2ulaw((buffer[i * 2] + buffer[i * 2 + 1]) >> 1);
+		mic_encoded[i] = linear2ulaw(buffer[i * DIVIDER]);
 	}
 	broadcast_audio_packets(mic_encoded, MIC_BUFFER_SAMPLES);
 }

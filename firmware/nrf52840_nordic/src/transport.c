@@ -12,7 +12,7 @@ static struct bt_uuid_128 audio_characteristic_uuid = BT_UUID_INIT_128(BT_UUID_1
 static struct bt_gatt_attr attrs[] = {
     BT_GATT_PRIMARY_SERVICE(&audio_service_uuid),
     BT_GATT_CHARACTERISTIC(&audio_characteristic_uuid.uuid, BT_GATT_CHRC_READ | BT_GATT_CHRC_NOTIFY, BT_GATT_PERM_READ, audio_characteristic_read, NULL, NULL),
-    BT_GATT_CCC(NULL, BT_GATT_PERM_READ | BT_GATT_PERM_WRITE)};
+    BT_GATT_CCC(ccc_config_changed_handler, BT_GATT_PERM_READ | BT_GATT_PERM_WRITE)};
 static struct bt_gatt_service audio_service = BT_GATT_SERVICE(attrs);
 
 // Advertisement data
@@ -29,6 +29,28 @@ static const struct bt_data bt_sd[] = {
 static ssize_t audio_characteristic_read(struct bt_conn *conn, const struct bt_gatt_attr *attr, void *buf, uint16_t len, uint16_t offset)
 {
     return bt_gatt_attr_read(conn, attr, buf, len, offset, NULL, 0);
+}
+
+static void ccc_config_changed_handler(const struct bt_gatt_attr *attr, uint16_t value)
+{
+    if (value == BT_GATT_CCC_NOTIFY)
+    {
+        // Client has subscribed for notifications
+        printk("Client subscribed for notifications\n");
+        // Add your code here for handling the subscription
+    }
+    else if (value == 0)
+    {
+        // Client has unsubscribed from notifications
+        printk("Client unsubscribed from notifications\n");
+        // Add your code here for handling the unsubscription
+    }
+    else
+    {
+        // Invalid value
+        printk("Invalid CCC value: %u\n", value);
+        // Add your code here for handling the invalid value
+    }
 }
 
 //

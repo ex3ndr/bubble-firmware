@@ -65,6 +65,9 @@ void codec_entry()
         {
             _callback(codec_output_bytes, output_size);
         }
+
+        // Yield
+        k_yield();
     }
 }
 

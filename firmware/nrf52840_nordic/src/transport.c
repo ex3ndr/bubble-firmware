@@ -38,6 +38,7 @@ static ssize_t audio_characteristic_read(struct bt_conn *conn, const struct bt_g
 void (*transport_connected)(struct bt_conn *conn, uint8_t err) = NULL;
 void (*transport_disconnected)(struct bt_conn *conn, uint8_t err) = NULL;
 struct bt_conn *current_connection = NULL;
+uint16_t current_mtu = 0;
 uint16_t current_package_index = 0;
 
 void _transport_connected(struct bt_conn *conn, uint8_t err)
@@ -52,6 +53,7 @@ void _transport_connected(struct bt_conn *conn, uint8_t err)
     }
 
     current_connection = bt_conn_ref(conn);
+    current_mtu = info.le.data_len->tx_max_len;
     printk("Connected\n");
     printk("Interval: %d, latency: %d, timeout: %d\n", info.le.interval, info.le.latency, info.le.timeout);
     printk("TX PHY %s, RX PHY %s\n", phy2str(info.le.phy->tx_phy), phy2str(info.le.phy->rx_phy));
@@ -106,6 +108,7 @@ static void _le_data_length_updated(struct bt_conn *conn,
            " RX (len: %d time: %d)\n",
            info->tx_max_len,
            info->tx_max_time, info->rx_max_len, info->rx_max_time);
+    current_mtu = info->tx_max_len;
 }
 
 static struct bt_conn_cb _callback_references = {
@@ -125,51 +128,70 @@ uint8_t ring_buffer_data[NETWORK_RING_BUF_SIZE];
 struct ring_buf ring_buf;
 K_THREAD_STACK_DEFINE(pusher_stack, 1024);
 static struct k_thread pusher_thread;
+uint8_t pusher_temp_data[251];
 
 void pusher(void)
 {
-    uint8_t data[180];
     size_t read_size;
     while (1)
     {
-        // Read data from ring buffer
-        read_size = ring_buf_get(&ring_buf, data, sizeof(data));
-        // printk("Read size: %d\n", read_size);
 
-        // Push data to audio characteristic
-        if (read_size > 0)
+        // Load current connection
+        struct bt_conn *conn = bt_conn_ref(current_connection);
+
+        if (current_mtu < MINIMAL_PACKET_SIZE || !conn)
         {
-            // Notify
-            while (true)
+            read_size = ring_buf_get(&ring_buf, pusher_temp_data, sizeof(pusher_temp_data)); // Just discard data
+            if (read_size <= 0)
             {
-
-                // Load current connection
-                struct bt_conn *conn = get_current_connection();
-
-                // Skip if no connection
-                if (!conn)
-                {
-                    // printk("No connection\n");
-                    break;
-                }
-
-                // Send notification
-                int err = bt_gatt_notify(conn, &audio_service.attrs[1], data, read_size);
-                if (err)
-                {
-                    printk("bt_gatt_notify failed (err %d)\n", err);
-                }
-                if (err == -EAGAIN || err == -ENOMEM)
-                {
-                    k_sleep(K_MSEC(1));
-                    continue;
-                }
-                break;
+                k_sleep(K_MSEC(1));
             }
+            else
+            {
+                printk("Discarded %d, current MTU: %d\n", read_size, current_mtu);
+            }
+
+            bt_conn_unref(conn);
+            continue;
         }
-        else
+
+        // Read data from ring buffer
+        read_size = ring_buf_get(&ring_buf, pusher_temp_data, current_mtu);
+        if (read_size <= 0) // Should not happen, but anyway
         {
-            k_sleep(K_MSEC(1));
+            k_sleep(K_MSEC(10));
+            continue;
+        }
+
+        // Notify
+        while (true)
+        {
+
+            // Try send notification
+            // printk("Sending %d bytes\n", read_size);
+            int err = bt_gatt_notify(conn, &audio_service.attrs[1], pusher_temp_data, read_size);
+
+            // Log failure
+            if (err)
+            {
+                printk("bt_gatt_notify failed (err %d)\n", err);
+                printk("MTU: %d, read_size: %d\n", current_mtu, read_size);
+                k_sleep(K_MSEC(10));
+            }
+            else
+            {
+                // printk("Sent %d bytes\n", read_size);
+            }
+
+            // Try to send more data if possible
+            if (err == -EAGAIN || err == -ENOMEM)
+            {
+                continue;
+            }
+
+            // Break if success
+            bt_conn_unref(conn);
+            break;
         }
     }
 }

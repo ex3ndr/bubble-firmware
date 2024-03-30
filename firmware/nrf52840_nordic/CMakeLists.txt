@@ -10,4 +10,5 @@ target_sources(app PRIVATE
     src/mic.c
     src/led.c
     src/audio.c
+    src/codec.c
 )

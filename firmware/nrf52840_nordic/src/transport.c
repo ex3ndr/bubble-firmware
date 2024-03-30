@@ -138,6 +138,10 @@ void pusher(void)
 
         // Load current connection
         struct bt_conn *conn = current_connection;
+        if (conn)
+        {
+            conn = bt_conn_ref(conn);
+        }
         bool valid = true;
         if (current_mtu < MINIMAL_PACKET_SIZE)
         {
@@ -162,6 +166,10 @@ void pusher(void)
             // Just discard data
             ring_buf_reset(&ring_buf);
             k_sleep(K_MSEC(10));
+            if (conn)
+            {
+                bt_conn_unref(conn);
+            }
             continue;
         }
 
@@ -170,6 +178,10 @@ void pusher(void)
         if (read_size <= 0) // Should not happen, but anyway
         {
             k_sleep(K_MSEC(50));
+            if (conn)
+            {
+                bt_conn_unref(conn);
+            }
             continue;
         }
 
@@ -200,7 +212,7 @@ void pusher(void)
             }
 
             // Break if success
-            // bt_conn_unref(conn);
+            bt_conn_unref(conn);
             break;
         }
     }

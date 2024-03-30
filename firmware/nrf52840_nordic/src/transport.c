@@ -128,16 +128,16 @@ uint8_t ring_buffer_data[NETWORK_RING_BUF_SIZE];
 struct ring_buf ring_buf;
 K_THREAD_STACK_DEFINE(pusher_stack, 1024);
 static struct k_thread pusher_thread;
-uint8_t pusher_temp_data[251];
 
 void pusher(void)
 {
+    uint8_t pusher_temp_data[251];
     size_t read_size;
     while (1)
     {
 
         // Load current connection
-        struct bt_conn *conn = bt_conn_ref(current_connection);
+        struct bt_conn *conn = current_connection;
 
         if (current_mtu < MINIMAL_PACKET_SIZE || !conn)
         {
@@ -151,7 +151,7 @@ void pusher(void)
                 printk("Discarded %d, current MTU: %d\n", read_size, current_mtu);
             }
 
-            bt_conn_unref(conn);
+            // bt_conn_unref(conn);
             continue;
         }
 
@@ -190,7 +190,7 @@ void pusher(void)
             }
 
             // Break if success
-            bt_conn_unref(conn);
+            // bt_conn_unref(conn);
             break;
         }
     }
@@ -246,7 +246,7 @@ int broadcast_audio_packets(uint8_t *buffer, size_t size)
     int written = ring_buf_put(&ring_buf, buffer, size);
     if (written != size)
     {
-        printk("Failed to write to ring buffer, written: %d, size: %d\n", written, size);
+        printk("Failed to write to network ring buffer, written: %d, size: %d\n", written, size);
         return -1;
     }
     return 0;

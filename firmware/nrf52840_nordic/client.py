@@ -14,7 +14,7 @@ DEVICE_NAME = "Super"
 SERVICE_UUID = "19B10000-E8F2-537E-4F6C-D104768A1214"
 CHARACTERISTIC_UUID = "19B10001-E8F2-537E-4F6C-D104768A1214"
 
-CODEC = "pcm"  # "pcm" or "mulaw" 
+CODEC = "mulaw"  # "pcm" or "mulaw" 
 SAMPLE_RATE = 16000  # Sample rate for the audio
 SAMPLE_WIDTH = 2  # 16-bit audio
 CHANNELS = 1  # Mono audio
@@ -73,15 +73,17 @@ async def main():
         if CODEC == "mulaw":
             pcm16_samples = audioop.ulaw2lin(audio_data, 2)
             pcm16_samples = struct.unpack('<' + 'h' * (len(pcm16_samples) // 2), pcm16_samples)
-            audio_data = np.frombuffer(audio_data, dtype=np.int16)
+            print(pcm16_samples)
+            audio_data = np.array(pcm16_samples, dtype=np.int16)
 
         if CODEC == "pcm":
             audio_data = audio_data[:len(audio_data) - len(audio_data) % 2]
             audio_data = np.frombuffer(audio_data, dtype=np.int16)
         
         # Normalize
-        scaling_factor = 2*32768 / (max(0, np.max(audio_data)) - min(0, np.min(audio_data)))
-        return (audio_data * scaling_factor).astype(np.int16)
+        # scaling_factor = 2*32768 / (max(0, np.max(audio_data)) - min(0, np.min(audio_data)))
+        # return (audio_data * scaling_factor).astype(np.int16)
+        return audio_data
     
     def export_audio_data(filtered_audio_data, raw_file, file_extension):
         recordings_dir = "recordings"

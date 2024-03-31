@@ -13,5 +13,4 @@ static void ccc_config_changed_handler(const struct bt_gatt_attr *attr, uint16_t
 
 // Callbacks
 int transport_start();
-struct bt_conn *get_current_connection();
 int broadcast_audio_packets(uint8_t *buffer, size_t size);

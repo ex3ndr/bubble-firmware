@@ -30,11 +30,13 @@ static const struct bt_data bt_sd[] = {
 
 static ssize_t audio_characteristic_read(struct bt_conn *conn, const struct bt_gatt_attr *attr, void *buf, uint16_t len, uint16_t offset)
 {
+    printk("audio_characteristic_read\n");
     return bt_gatt_attr_read(conn, attr, buf, len, offset, NULL, 0);
 }
 
 static ssize_t audio_characteristic_format_read(struct bt_conn *conn, const struct bt_gatt_attr *attr, void *buf, uint16_t len, uint16_t offset)
 {
+    printk("audio_characteristic_format_read\n");
     uint8_t value[1] = {CODEC_ID};
     return bt_gatt_attr_read(conn, attr, buf, len, offset, value, sizeof(value));
 }
@@ -99,10 +101,12 @@ void _transport_disconnected(struct bt_conn *conn, uint8_t err)
 {
     printk("err: %d\n", err);
     printk("Disconnected\n");
-    if (current_connection)
+    bt_conn_unref(conn);
+    current_connection = NULL;
+    current_mtu = 0;
+    if (transport_disconnected)
     {
-        bt_conn_unref(current_connection);
-        transport_disconnected(current_connection, err);
+        transport_disconnected(conn, err);
     }
 }
 

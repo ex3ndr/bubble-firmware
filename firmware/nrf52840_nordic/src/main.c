@@ -31,21 +31,17 @@ int main(void)
 	// Led start
 	ASSERT_OK(led_start());
 	set_led_blue(true);
-	// k_msleep(3000);
 
 	// Transport start
 	ASSERT_OK(transport_start());
-	// k_msleep(100);
 
-	// // Codec start
-	// set_codec_callback(codec_handler);
-	// ASSERT_OK(codec_start());
-	// k_msleep(100);
+	// Codec start
+	set_codec_callback(codec_handler);
+	ASSERT_OK(codec_start());
 
-	// // Mic start
-	// set_mic_callback(mic_handler);
-	// ASSERT_OK(mic_start());
-	// k_msleep(100);
+	// Mic start
+	set_mic_callback(mic_handler);
+	ASSERT_OK(mic_start());
 
 	// Blink LED
 	bool is_on = true;

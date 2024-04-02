@@ -1,5 +1,5 @@
 #pragma once
-
+#include <zephyr/logging/log.h>
 #include <zephyr/bluetooth/gatt.h>
 
 #define ASSERT_OK(result)                                          \
@@ -26,3 +26,8 @@ static const char *phy2str(uint8_t phy)
 	default: return "Unknown";
 	}
 }
+
+// #define WAIT_LOG k_sleep(K_MSEC(200));
+// #define WAIT_LOG do {} while(0);
+// #define WAIT_LOG z_impl_log_process()
+// #define WAIT_LOG while (z_impl_log_process() == true) { }

@@ -7,6 +7,7 @@
 #define AUDIO_BUFFER_SAMPLES 16000      // 1s
 #define NETWORK_RING_BUF_SIZE 32 * 1024 // 32KB
 #define MINIMAL_PACKET_SIZE 100         // Less than that doesn't make sence to send anything at all
+// #define ENABLE_L2CAP 1
 
 // PIN definitions
 // https://github.com/Seeed-Studio/Adafruit_nRF52_Arduino/blob/5aa3573913449410fd60f76b75673c53855ff2ec/variants/Seeed_XIAO_nRF52840_Sense/variant.cpp#L34
@@ -20,7 +21,7 @@
 
 // Codec packages
 #if CODEC_PCM | CODEC_MU_LAW
-#define CODEC_DIVIDER 1 // 1, 2 or 4
+#define CODEC_DIVIDER 2           // 1 or 2
 #define CODEC_PACKAGE_SAMPLES 160 // 10ms
 #if CODEC_PCM
 #define CODEC_OUTPUT_MAX_BYTES CODEC_PACKAGE_SAMPLES * 2
@@ -35,12 +36,15 @@
 #define CODEC_ID 0
 #elif CODEC_DIVIDER == 2
 #define CODEC_ID 1
-#elif CODEC_DIVIDER == 2
-#define CODEC_ID 2
 #endif
 #endif
+
 #ifdef CODEC_MU_LAW
+#if CODEC_DIVIDER == 1
 #define CODEC_ID 10
+#elif CODEC_DIVIDER == 2
+#define CODEC_ID 11
+#endif
 #endif
 
 // Logs

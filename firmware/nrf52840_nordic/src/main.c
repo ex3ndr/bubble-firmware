@@ -28,22 +28,28 @@ void bt_ctlr_assert_handle(char *name, int type)
 // Main loop
 int main(void)
 {
-	// Transport start
-	ASSERT_OK(transport_start());
-
 	// Led start
 	ASSERT_OK(led_start());
+	set_led_blue(true);
+	// k_msleep(3000);
 
-	// Codec start
-	set_codec_callback(codec_handler);
-	ASSERT_OK(codec_start());
+	// Transport start
+	ASSERT_OK(transport_start());
+	// k_msleep(100);
 
-	// Mic start
-	set_mic_callback(mic_handler);
-	ASSERT_OK(mic_start());
+	// // Codec start
+	// set_codec_callback(codec_handler);
+	// ASSERT_OK(codec_start());
+	// k_msleep(100);
+
+	// // Mic start
+	// set_mic_callback(mic_handler);
+	// ASSERT_OK(mic_start());
+	// k_msleep(100);
 
 	// Blink LED
-	bool is_on = false;
+	bool is_on = true;
+	set_led_blue(false);
 	set_led_red(is_on);
 	while (1)
 	{

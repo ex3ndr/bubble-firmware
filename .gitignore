@@ -1,3 +1,4 @@
 .vscode
 build
 firmware/nrf52840_nordic/recordings
+firmware/nrf52840_nordic/build_debug

@@ -264,14 +264,33 @@ static struct ring_buf ring_buf;
 K_THREAD_STACK_DEFINE(pusher_stack, 1024);
 static struct k_thread pusher_thread;
 NET_BUF_POOL_DEFINE(pool, 10, CONFIG_BT_CTLR_DATA_LENGTH_MAX, 0, NULL);
-static uint8_t pusher_temp_data[CONFIG_BT_CTLR_DATA_LENGTH_MAX];
+static uint8_t pusher_temp_data[CONFIG_BT_CTLR_DATA_LENGTH_MAX + 2];
 static size_t read_size;
+
+static uint32_t get_buffer(uint32_t size)
+{
+    // Read buffer
+    read_size = ring_buf_get(&ring_buf, pusher_temp_data + 2, size);
+    if (read_size <= 0)
+    {
+        return 0;
+    }
+
+    // Add package index
+    pusher_temp_data[0] = current_package_index & 0xFF;
+    pusher_temp_data[1] = (current_package_index >> 8) & 0xFF;
+
+    // Increase package index
+    current_package_index++;
+
+    return read_size + 2;
+}
 
 static bool push_to_gatt(struct bt_conn *conn)
 {
     // Read data from ring buffer
-    read_size = ring_buf_get(&ring_buf, pusher_temp_data, current_mtu);
-    if (read_size <= 0) // Should not happen, but anyway
+    read_size = get_buffer(current_mtu);
+    if (read_size <= 0)
     {
         return false;
     }

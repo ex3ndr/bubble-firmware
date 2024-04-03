@@ -90,13 +90,15 @@ void codec_entry()
 
 int codec_start()
 {
+    
 // OPUS
 #if CODEC_OPUS
+    ASSERT_TRUE(opus_encoder_get_size(1) == sizeof(m_opus_encoder));
     ASSERT_TRUE(opus_encoder_init(m_opus_state, 16000, 1, CODEC_OPUS_APPLICATION) == OPUS_OK);
-    ASSERT_TRUE(opus_encoder_ctl(m_opus_state, OPUS_SET_BITRATE(24000)) == OPUS_OK);
-    ASSERT_TRUE(opus_encoder_ctl(m_opus_state, OPUS_SET_VBR(0)) == OPUS_OK);
+    ASSERT_TRUE(opus_encoder_ctl(m_opus_state, OPUS_SET_BITRATE(CODEC_OPUS_APPLICATION)) == OPUS_OK);
+    ASSERT_TRUE(opus_encoder_ctl(m_opus_state, OPUS_SET_VBR(CODEC_OPUS_VBR)) == OPUS_OK);
     ASSERT_TRUE(opus_encoder_ctl(m_opus_state, OPUS_SET_VBR_CONSTRAINT(0)) == OPUS_OK);
-    ASSERT_TRUE(opus_encoder_ctl(m_opus_state, OPUS_SET_COMPLEXITY(4)) == OPUS_OK);
+    ASSERT_TRUE(opus_encoder_ctl(m_opus_state, OPUS_SET_COMPLEXITY(CODEC_OPUS_COMPLEXITY)) == OPUS_OK);
     ASSERT_TRUE(opus_encoder_ctl(m_opus_state, OPUS_SET_SIGNAL(OPUS_SIGNAL_VOICE)) == OPUS_OK);
     ASSERT_TRUE(opus_encoder_ctl(m_opus_state, OPUS_SET_LSB_DEPTH(16)) == OPUS_OK);
     ASSERT_TRUE(opus_encoder_ctl(m_opus_state, OPUS_SET_DTX(0)) == OPUS_OK);

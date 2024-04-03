@@ -17,17 +17,26 @@
 
 // Codecs
 // #define CODEC_PCM 1
-#define CODEC_MU_LAW 1
+// #define CODEC_MU_LAW 1
+#define CODEC_OPUS 1
 
 // Codec packages
 #if CODEC_PCM | CODEC_MU_LAW
-#define CODEC_DIVIDER 2           // 1 or 2
+#define CODEC_DIVIDER 1           // 1 or 2
 #define CODEC_PACKAGE_SAMPLES 160 // 10ms
 #if CODEC_PCM
 #define CODEC_OUTPUT_MAX_BYTES CODEC_PACKAGE_SAMPLES * 2
 #else
 #define CODEC_OUTPUT_MAX_BYTES CODEC_PACKAGE_SAMPLES
 #endif
+#endif
+
+#if CODEC_OPUS
+#define CODEC_DIVIDER 1
+#define CODEC_PACKAGE_SAMPLES 80 // 5ms
+#define CODEC_OUTPUT_MAX_BYTES 3840 // ???
+#define CODEC_OPUS_APPLICATION    OPUS_APPLICATION_RESTRICTED_LOWDELAY
+
 #endif
 
 // Codec IDs
@@ -45,6 +54,10 @@
 #elif CODEC_DIVIDER == 2
 #define CODEC_ID 11
 #endif
+#endif
+
+#ifdef CODEC_OPUS
+#define CODEC_ID 20
 #endif
 
 // Logs

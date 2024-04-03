@@ -2,6 +2,10 @@
 #include "codec.h"
 #include "audio.h"
 #include "config.h"
+#include "utils.h"
+#ifdef CODEC_OPUS
+#include "opus-1.2.1/opus.h"
+#endif
 
 //
 // Output
@@ -41,6 +45,19 @@ uint8_t codec_output_bytes[CODEC_OUTPUT_MAX_BYTES];
 K_THREAD_STACK_DEFINE(codec_stack, 1024);
 static struct k_thread codec_thread;
 uint16_t execute_codec();
+
+#if CODEC_OPUS
+#if (CONFIG_OPUS_MODE == CONFIG_OPUS_MODE_CELT)
+#define OPUS_ENCODER_SIZE 7180
+#endif
+#if (CONFIG_OPUS_MODE == CONFIG_OPUS_MODE_HYBRID)
+#define OPUS_ENCODER_SIZE 10916
+#endif
+__ALIGN(4)
+static uint8_t m_opus_encoder[OPUS_ENCODER_SIZE];
+static OpusEncoder *const m_opus_state = (OpusEncoder *)m_opus_encoder;
+#endif
+
 void codec_entry()
 {
     uint16_t output_size;
@@ -73,8 +90,25 @@ void codec_entry()
 
 int codec_start()
 {
+// OPUS
+#if CODEC_OPUS
+    ASSERT_TRUE(opus_encoder_init(m_opus_state, 16000, 1, CODEC_OPUS_APPLICATION) == OPUS_OK);
+    ASSERT_TRUE(opus_encoder_ctl(m_opus_state, OPUS_SET_BITRATE(24000)) == OPUS_OK);
+    ASSERT_TRUE(opus_encoder_ctl(m_opus_state, OPUS_SET_VBR(0)) == OPUS_OK);
+    ASSERT_TRUE(opus_encoder_ctl(m_opus_state, OPUS_SET_VBR_CONSTRAINT(0)) == OPUS_OK);
+    ASSERT_TRUE(opus_encoder_ctl(m_opus_state, OPUS_SET_COMPLEXITY(4)) == OPUS_OK);
+    ASSERT_TRUE(opus_encoder_ctl(m_opus_state, OPUS_SET_SIGNAL(OPUS_SIGNAL_VOICE)) == OPUS_OK);
+    ASSERT_TRUE(opus_encoder_ctl(m_opus_state, OPUS_SET_LSB_DEPTH(16)) == OPUS_OK);
+    ASSERT_TRUE(opus_encoder_ctl(m_opus_state, OPUS_SET_DTX(0)) == OPUS_OK);
+    ASSERT_TRUE(opus_encoder_ctl(m_opus_state, OPUS_SET_INBAND_FEC(0)) == OPUS_OK);
+    ASSERT_TRUE(opus_encoder_ctl(m_opus_state, OPUS_SET_PACKET_LOSS_PERC(0)) == OPUS_OK);
+#endif
+
+    // Thread
     ring_buf_init(&codec_ring_buf, sizeof(codec_ring_buffer_data), codec_ring_buffer_data);
     k_thread_create(&codec_thread, codec_stack, K_THREAD_STACK_SIZEOF(codec_stack), (k_thread_entry_t)codec_entry, NULL, NULL, NULL, K_PRIO_COOP(7), 0, K_NO_WAIT);
+
+    // Success
     return 0;
 }
 
@@ -110,4 +144,23 @@ uint16_t execute_codec()
     }
     return (CODEC_PACKAGE_SAMPLES / CODEC_DIVIDER) * 2;
 }
+#endif
+
+//
+// Opus codec
+//
+
+#if CODEC_OPUS
+
+uint16_t execute_codec()
+{
+    opus_int32 size = opus_encode(m_opus_state, codec_input_samples, CODEC_PACKAGE_SAMPLES, codec_output_bytes, sizeof(codec_output_bytes));
+    if (size < 0)
+    {
+        printk("Opus encoding failed: %d\n", size);
+        return 0;
+    }
+    return size;
+}
+
 #endif

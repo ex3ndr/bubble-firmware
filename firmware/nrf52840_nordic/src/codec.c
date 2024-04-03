@@ -42,7 +42,7 @@ int codec_receive_pcm(int16_t *data, size_t len)
 
 int16_t codec_input_samples[CODEC_PACKAGE_SAMPLES];
 uint8_t codec_output_bytes[CODEC_OUTPUT_MAX_BYTES];
-K_THREAD_STACK_DEFINE(codec_stack, 1024);
+K_THREAD_STACK_DEFINE(codec_stack, 32000);
 static struct k_thread codec_thread;
 uint16_t execute_codec();
 
@@ -95,7 +95,7 @@ int codec_start()
 #if CODEC_OPUS
     ASSERT_TRUE(opus_encoder_get_size(1) == sizeof(m_opus_encoder));
     ASSERT_TRUE(opus_encoder_init(m_opus_state, 16000, 1, CODEC_OPUS_APPLICATION) == OPUS_OK);
-    ASSERT_TRUE(opus_encoder_ctl(m_opus_state, OPUS_SET_BITRATE(CODEC_OPUS_APPLICATION)) == OPUS_OK);
+    ASSERT_TRUE(opus_encoder_ctl(m_opus_state, OPUS_SET_BITRATE(CODEC_OPUS_BITRATE)) == OPUS_OK);
     ASSERT_TRUE(opus_encoder_ctl(m_opus_state, OPUS_SET_VBR(CODEC_OPUS_VBR)) == OPUS_OK);
     ASSERT_TRUE(opus_encoder_ctl(m_opus_state, OPUS_SET_VBR_CONSTRAINT(0)) == OPUS_OK);
     ASSERT_TRUE(opus_encoder_ctl(m_opus_state, OPUS_SET_COMPLEXITY(CODEC_OPUS_COMPLEXITY)) == OPUS_OK);
@@ -162,6 +162,7 @@ uint16_t execute_codec()
         printk("Opus encoding failed: %d\n", size);
         return 0;
     }
+    // printk("Opus encoding success: %i\n", size);
     return size;
 }
 

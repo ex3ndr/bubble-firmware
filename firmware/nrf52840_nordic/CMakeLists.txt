@@ -3,6 +3,7 @@
 cmake_minimum_required(VERSION 3.20.0)
 find_package(Zephyr REQUIRED HINTS $ENV{ZEPHYR_BASE})
 project(nrf52840_nordic)
+enable_language(C ASM)
 
 target_sources(app PRIVATE
     src/main.c
@@ -140,8 +141,11 @@ target_sources(app PRIVATE
     src/opus-1.2.1/vector_ops_FIX.c
     src/opus-1.2.1/vq.c
     src/opus-1.2.1/warped_autocorrelation_FIX.c
+    src/opus-1.2.1/arm/celt_pitch_xcorr_arm_gcc.s
 )
 
+set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -DARM_MATH_CM4")
+# set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -DVAR_ARRAYS")
 set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -DOPUS_ARM_ASM")
 set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -DOPUS_ARM_INLINE_ASM")
 set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -DOPUS_ARM_INLINE_EDSP")

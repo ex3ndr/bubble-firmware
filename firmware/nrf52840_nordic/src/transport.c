@@ -1,9 +1,11 @@
+#include <zephyr/kernel.h>
 #include <zephyr/logging/log.h>
 #include <zephyr/sys/ring_buffer.h>
 #include <zephyr/bluetooth/bluetooth.h>
 #include <zephyr/bluetooth/uuid.h>
 #include <zephyr/bluetooth/gatt.h>
 #include <zephyr/bluetooth/l2cap.h>
+#include <zephyr/sys/atomic.h>
 #include "transport.h"
 #include "config.h"
 #include "utils.h"
@@ -13,18 +15,9 @@
 //
 
 static struct bt_conn_cb _callback_references;
-#ifdef ENABLE_L2CAP
-static struct bt_l2cap_chan_ops _callback_l2cap_references;
-#endif
 static ssize_t audio_characteristic_read(struct bt_conn *conn, const struct bt_gatt_attr *attr, void *buf, uint16_t len, uint16_t offset);
 static ssize_t audio_characteristic_format_read(struct bt_conn *conn, const struct bt_gatt_attr *attr, void *buf, uint16_t len, uint16_t offset);
-#ifdef ENABLE_L2CAP
-static ssize_t audio_channel_read(struct bt_conn *conn, const struct bt_gatt_attr *attr, void *buf, uint16_t len, uint16_t offset);
-#endif
 static void ccc_config_changed_handler(const struct bt_gatt_attr *attr, uint16_t value);
-#ifdef ENABLE_L2CAP
-static int _l2cap_accept(struct bt_conn *conn, struct bt_l2cap_server *server, struct bt_l2cap_chan **chan);
-#endif
 
 //
 // Service and Characteristic
@@ -33,17 +26,11 @@ static int _l2cap_accept(struct bt_conn *conn, struct bt_l2cap_server *server, s
 static struct bt_uuid_128 audio_service_uuid = BT_UUID_INIT_128(BT_UUID_128_ENCODE(0x19B10000, 0xE8F2, 0x537E, 0x4F6C, 0xD104768A1214));
 static struct bt_uuid_128 audio_characteristic_uuid = BT_UUID_INIT_128(BT_UUID_128_ENCODE(0x19B10001, 0xE8F2, 0x537E, 0x4F6C, 0xD104768A1214));
 static struct bt_uuid_128 audio_characteristic_format_uuid = BT_UUID_INIT_128(BT_UUID_128_ENCODE(0x19B10002, 0xE8F2, 0x537E, 0x4F6C, 0xD104768A1214));
-#ifdef ENABLE_L2CAP
-static struct bt_uuid_128 audio_stream_uuid = BT_UUID_INIT_128(BT_UUID_128_ENCODE(0x19B10003, 0xE8F2, 0x537E, 0x4F6C, 0xD104768A1214));
-#endif
 static struct bt_gatt_attr attrs[] = {
     BT_GATT_PRIMARY_SERVICE(&audio_service_uuid),
     BT_GATT_CHARACTERISTIC(&audio_characteristic_uuid.uuid, BT_GATT_CHRC_READ | BT_GATT_CHRC_NOTIFY, BT_GATT_PERM_READ, audio_characteristic_read, NULL, NULL),
     BT_GATT_CCC(ccc_config_changed_handler, BT_GATT_PERM_READ | BT_GATT_PERM_WRITE),
     BT_GATT_CHARACTERISTIC(&audio_characteristic_format_uuid.uuid, BT_GATT_CHRC_READ, BT_GATT_PERM_READ, audio_characteristic_format_read, NULL, NULL),
-#ifdef ENABLE_L2CAP
-    BT_GATT_CHARACTERISTIC(&audio_stream_uuid.uuid, BT_GATT_CHRC_READ, BT_GATT_PERM_READ, audio_channel_read, NULL, NULL),
-#endif
 };
 static struct bt_gatt_service audio_service = BT_GATT_SERVICE(attrs);
 
@@ -58,13 +45,6 @@ static const struct bt_data bt_sd[] = {
     BT_DATA(BT_DATA_UUID128_ALL, audio_service_uuid.val, sizeof(audio_service_uuid.val)),
 };
 
-#ifdef ENABLE_L2CAP
-static struct bt_l2cap_chan_ops _callback_l2cap_references;
-static struct bt_l2cap_server _l2cap_server = {
-    .psm = 0,
-    .sec_level = BT_SECURITY_L1,
-    .accept = _l2cap_accept};
-#endif
 //
 // State and Characteristics
 //
@@ -72,12 +52,6 @@ static struct bt_l2cap_server _l2cap_server = {
 struct bt_conn *current_connection = NULL;
 uint16_t current_mtu = 0;
 uint16_t current_package_index = 0;
-#ifdef ENABLE_L2CAP
-struct bt_l2cap_chan current_l2cap_channel = {};
-bool current_l2cap_ready = false;
-bool current_l2cap_used = false;
-uint16_t current_l2cap_psm = 0;
-#endif
 
 static ssize_t audio_characteristic_read(struct bt_conn *conn, const struct bt_gatt_attr *attr, void *buf, uint16_t len, uint16_t offset)
 {
@@ -91,15 +65,6 @@ static ssize_t audio_characteristic_format_read(struct bt_conn *conn, const stru
     uint8_t value[1] = {CODEC_ID};
     return bt_gatt_attr_read(conn, attr, buf, len, offset, value, sizeof(value));
 }
-
-#ifdef ENABLE_L2CAP
-static ssize_t audio_channel_read(struct bt_conn *conn, const struct bt_gatt_attr *attr, void *buf, uint16_t len, uint16_t offset)
-{
-    printk("audio_channel_read %d\n", _l2cap_server.psm);
-    uint16_t value[1] = {_l2cap_server.psm};
-    return bt_gatt_attr_read(conn, attr, buf, len, offset, value, sizeof(value));
-}
-#endif
 
 static void ccc_config_changed_handler(const struct bt_gatt_attr *attr, uint16_t value)
 {
@@ -133,10 +98,6 @@ static void _transport_connected(struct bt_conn *conn, uint8_t err)
 
     current_connection = bt_conn_ref(conn);
     current_mtu = info.le.data_len->tx_max_len;
-#ifdef ENABLE_L2CAP
-    current_l2cap_ready = false;
-    current_l2cap_psm = 0;
-#endif
     printk("Connected\n");
     printk("Interval: %d, latency: %d, timeout: %d\n", info.le.interval, info.le.latency, info.le.timeout);
     printk("TX PHY %s, RX PHY %s\n", phy2str(info.le.phy->tx_phy), phy2str(info.le.phy->rx_phy));
@@ -148,10 +109,6 @@ static void _transport_disconnected(struct bt_conn *conn, uint8_t err)
     printk("Disconnected\n");
     bt_conn_unref(conn);
     current_connection = NULL;
-#ifdef ENABLE_L2CAP
-    current_l2cap_ready = false;
-    current_l2cap_psm = 0;
-#endif
     current_mtu = 0;
 }
 
@@ -190,53 +147,6 @@ static void _le_data_length_updated(struct bt_conn *conn,
     current_mtu = info->tx_max_len;
 }
 
-#ifdef ENABLE_L2CAP
-
-static int _l2cap_accept(struct bt_conn *conn, struct bt_l2cap_server *server, struct bt_l2cap_chan **chan)
-{
-    if (current_l2cap_used)
-    {
-        printk("L2CAP channel already in use\n");
-        return -ENOMEM;
-    }
-
-    printk("Incoming L2CAP channel connection\n");
-    memset(&current_l2cap_channel, 0, sizeof(current_l2cap_channel));
-    current_l2cap_channel.ops = &_callback_l2cap_references;
-    *chan = &current_l2cap_channel;
-    current_l2cap_ready = false;
-    current_l2cap_used = true;
-
-    return 0;
-}
-
-static void _l2cap_connected(struct bt_l2cap_chan *chan)
-{
-    printk("L2CAP channel connected\n");
-    current_l2cap_ready = true;
-}
-
-static void _l2cap_disconnected(struct bt_l2cap_chan *chan)
-{
-    printk("L2CAP channel disconnected\n");
-    current_l2cap_ready = false;
-    current_l2cap_used = false;
-}
-
-static int _l2cap_received(struct bt_l2cap_chan *chan, struct net_buf *buf)
-{
-    printk("Received data: %d\n", buf->len);
-    net_buf_unref(buf);
-    return 0;
-}
-
-static void _l2cap_status(struct bt_l2cap_chan *chan, atomic_t *status)
-{
-    printk("L2CAP status: %ld\n", atomic_get(status));
-}
-
-#endif
-
 static struct bt_conn_cb _callback_references = {
     .connected = _transport_connected,
     .disconnected = _transport_disconnected,
@@ -246,116 +156,119 @@ static struct bt_conn_cb _callback_references = {
     .le_data_len_updated = _le_data_length_updated,
 };
 
-#ifdef ENABLE_L2CAP
-static struct bt_l2cap_chan_ops _callback_l2cap_references = {
-    .connected = _l2cap_connected,
-    .disconnected = _l2cap_disconnected,
-    .recv = _l2cap_received,
-    .status = _l2cap_status,
-};
-#endif
+//
+// Ring Buffer
+//
+
+#define NET_BUFFER_HEADER_SIZE 3
+#define RING_BUFFER_HEADER_SIZE 2
+static uint8_t tx_queue[NETWORK_RING_BUF_SIZE * (CODEC_OUTPUT_MAX_BYTES + RING_BUFFER_HEADER_SIZE)];
+static uint8_t tx_buffer[CODEC_OUTPUT_MAX_BYTES + RING_BUFFER_HEADER_SIZE];
+static uint8_t tx_buffer_2[CODEC_OUTPUT_MAX_BYTES + RING_BUFFER_HEADER_SIZE];
+static uint32_t tx_buffer_size = 0;
+static struct ring_buf ring_buf;
+
+static bool write_to_tx_queue(uint8_t *data, size_t size)
+{
+    if (size > CODEC_OUTPUT_MAX_BYTES)
+    {
+        return false;
+    }
+
+    // Copy data (TODO: Avoid this copy)
+    tx_buffer_2[0] = size & 0xFF;
+    tx_buffer_2[1] = (size >> 8) & 0xFF;
+    memcpy(tx_buffer_2 + RING_BUFFER_HEADER_SIZE, data, size);
+
+    // Write to ring buffer
+    int written = ring_buf_put(&ring_buf, tx_buffer_2, (CODEC_OUTPUT_MAX_BYTES + RING_BUFFER_HEADER_SIZE)); // It always fits completely or not at all
+    if (written != CODEC_OUTPUT_MAX_BYTES + RING_BUFFER_HEADER_SIZE)
+    {
+        return false;
+    }
+    else
+    {
+        return true;
+    }
+}
+
+static bool read_from_tx_queue()
+{
+
+    // Read from ring buffer
+    tx_buffer_size = ring_buf_get(&ring_buf, tx_buffer, (CODEC_OUTPUT_MAX_BYTES + RING_BUFFER_HEADER_SIZE)); // It always fits completely or not at all
+    if (tx_buffer_size != (CODEC_OUTPUT_MAX_BYTES + RING_BUFFER_HEADER_SIZE))
+    {
+        printk("Failed to read from ring buffer %d\n", tx_buffer_size);
+        return false;
+    }
+
+    // Adjust size
+    tx_buffer_size = tx_buffer[0] + (tx_buffer[1] << 8);
+
+    return true;
+}
 
 //
 // Pusher
 //
 
-static uint8_t ring_buffer_data[NETWORK_RING_BUF_SIZE];
-static struct ring_buf ring_buf;
+// Thread
 K_THREAD_STACK_DEFINE(pusher_stack, 1024);
 static struct k_thread pusher_thread;
-NET_BUF_POOL_DEFINE(pool, 10, CONFIG_BT_CTLR_DATA_LENGTH_MAX, 0, NULL);
-static uint8_t pusher_temp_data[CONFIG_BT_CTLR_DATA_LENGTH_MAX + 2];
-static size_t read_size;
-
-static uint32_t get_buffer(uint32_t size)
-{
-    // Read buffer
-    read_size = ring_buf_get(&ring_buf, pusher_temp_data + 2, size);
-    if (read_size <= 0)
-    {
-        return 0;
-    }
-
-    // Add package index
-    pusher_temp_data[0] = current_package_index & 0xFF;
-    pusher_temp_data[1] = (current_package_index >> 8) & 0xFF;
-
-    // Increase package index
-    current_package_index++;
-
-    return read_size + 2;
-}
+static uint16_t packet_next_index = 0;
+static uint8_t pusher_temp_data[CODEC_OUTPUT_MAX_BYTES + NET_BUFFER_HEADER_SIZE];
 
 static bool push_to_gatt(struct bt_conn *conn)
 {
     // Read data from ring buffer
-    read_size = get_buffer(current_mtu);
-    if (read_size <= 0)
+    if (!read_from_tx_queue())
     {
         return false;
     }
 
-    // Notify
-    while (true)
+    // Push each frame
+    uint32_t offset = RING_BUFFER_HEADER_SIZE; // Skip header
+    uint8_t index = 0;
+    while (offset < tx_buffer_size)
     {
+        // Recombine packet
+        uint32_t id = packet_next_index++;
+        uint32_t packet_size = MIN(current_mtu - NET_BUFFER_HEADER_SIZE, tx_buffer_size - offset);
+        pusher_temp_data[0] = id & 0xFF;
+        pusher_temp_data[1] = (id >> 8) & 0xFF;
+        pusher_temp_data[2] = index;
+        memcpy(pusher_temp_data + NET_BUFFER_HEADER_SIZE, tx_buffer + offset, packet_size);
+        offset += packet_size;
+        index++;
 
-        // Try send notification
-        int err = bt_gatt_notify(conn, &audio_service.attrs[1], pusher_temp_data, read_size);
-
-        // Log failure
-        if (err)
+        while (true)
         {
-            printk("bt_gatt_notify failed (err %d)\n", err);
-            printk("MTU: %d, read_size: %d\n", current_mtu, read_size);
-            k_sleep(K_MSEC(50));
-        }
 
-        // Try to send more data if possible
-        if (err == -EAGAIN || err == -ENOMEM)
-        {
-            continue;
-        }
+            // Try send notification
+            int err = bt_gatt_notify(conn, &audio_service.attrs[1], pusher_temp_data, packet_size + NET_BUFFER_HEADER_SIZE);
 
-        // Break if success
-        break;
+            // Log failure
+            if (err)
+            {
+                printk("bt_gatt_notify failed (err %d)\n", err);
+                printk("MTU: %d, packet_size: %d\n", current_mtu, packet_size + NET_BUFFER_HEADER_SIZE);
+                k_sleep(K_MSEC(1));
+            }
+
+            // Try to send more data if possible
+            if (err == -EAGAIN || err == -ENOMEM)
+            {
+                continue;
+            }
+
+            // Break if success
+            break;
+        }
     }
 
     return true;
 }
-
-#ifdef ENABLE_L2CAP
-bool push_to_l2cap()
-{
-    printk("Pushing to L2CAP@0\n");
-
-    // Read data from ring buffer
-    read_size = ring_buf_get(&ring_buf, pusher_temp_data, current_mtu);
-    if (read_size <= 0) // Should not happen, but anyway
-    {
-        return false;
-    }
-
-    // Allocate buffer
-    printk("Pushing to L2CAP@1\n");
-    struct net_buf *buf = net_buf_alloc(&pool, K_FOREVER);
-    if (!buf)
-    {
-        printk("Failed to allocate buffer\n");
-        return false;
-    }
-    net_buf_add_mem(buf, pusher_temp_data, read_size);
-
-    // Send data
-    printk("Pushing to L2CAP@2\n");
-    int err = bt_l2cap_chan_send(&current_l2cap_channel, buf);
-    if (err)
-    {
-        printk("Failed to send data (err %d)\n", err);
-    }
-
-    return true;
-}
-#endif
 
 void pusher(void)
 {
@@ -381,12 +294,6 @@ void pusher(void)
         {
             valid = false;
         }
-#ifdef ENABLE_L2CAP
-        else if (!current_l2cap_ready)
-        {
-            valid = false;
-        }
-#endif
         else
         {
             valid = bt_gatt_is_subscribed(conn, &audio_service.attrs[1], BT_GATT_CCC_NOTIFY); // Check if subscribed
@@ -408,18 +315,6 @@ void pusher(void)
                 k_sleep(K_MSEC(50));
             }
         }
-
-// Handle L2CAP
-#ifdef ENABLE_L2CAP
-        if (!use_gatt && valid)
-        {
-            bool sent = push_to_l2cap(current_l2cap_channel);
-            if (!sent)
-            {
-                k_sleep(K_MSEC(50));
-            }
-        }
-#endif
 
         if (conn)
         {
@@ -447,20 +342,6 @@ int transport_start()
     }
     printk("Bluetooth initialized\n");
 
-#ifdef ENABLE_L2CAP
-    // Register L2CAP server
-    err = bt_l2cap_server_register(&_l2cap_server);
-    if (err)
-    {
-        printk("L2CAP server registration failed (err %d)\n", err);
-        return err;
-    }
-    else
-    {
-        printk("L2CAP server registered\n");
-    }
-#endif
-
     // Start advertising
     bt_gatt_service_register(&audio_service);
     err = bt_le_adv_start(BT_LE_ADV_CONN, bt_ad, ARRAY_SIZE(bt_ad), bt_sd, ARRAY_SIZE(bt_sd));
@@ -475,7 +356,7 @@ int transport_start()
     }
 
     // Start pusher
-    ring_buf_init(&ring_buf, sizeof(ring_buffer_data), ring_buffer_data);
+    ring_buf_init(&ring_buf, sizeof(tx_queue), tx_queue);
     k_thread_create(&pusher_thread, pusher_stack, K_THREAD_STACK_SIZEOF(pusher_stack), (k_thread_entry_t)pusher, NULL, NULL, NULL, K_PRIO_PREEMPT(7), 0, K_NO_WAIT);
 
     return 0;
@@ -488,10 +369,14 @@ struct bt_conn *get_current_connection()
 
 int broadcast_audio_packets(uint8_t *buffer, size_t size)
 {
-    int written = ring_buf_put(&ring_buf, buffer, size);
-    if (written != size)
+    // printk("broadcast_audio_packets %d\n", size);
+    if (!write_to_tx_queue(buffer, size))
     {
+        printk("Failed to write to tx queue\n");
         return -1;
     }
-    return 0;
+    else
+    {
+        return 0;
+    }
 }

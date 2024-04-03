@@ -2,6 +2,8 @@
 #define CONFIG_OPUS_MODE_SILK                   (1 << 1)
 #define CONFIG_OPUS_MODE_HYBRID                 (CONFIG_OPUS_MODE_CELT | CONFIG_OPUS_MODE_SILK)
 
+#include "../config.h"
+
 // <h> Opus Options
 // <o> Mode
 // <i> SILK mode is specifically dedicated for voice but requires more CPU and memory resources than CELT.
@@ -11,7 +13,7 @@
 //  <1=>CELT Only
 //  <2=>SILK Only
 /**@brief Opus Options: Mode */
-#define CONFIG_OPUS_MODE CONFIG_OPUS_MODE_SILK
+// #define CONFIG_OPUS_MODE CONFIG_OPUS_MODE_CELT
 
 // <o> Bit Rate
 // <i> VBR - Variable Bit Rate is fully controlled by the codec.
@@ -47,7 +49,7 @@
 //              1 = CBR
 //
 /**@brief Opus Options: Bit Rate */
-#define CONFIG_OPUS_BITRATE_CFG 32001
+// #define CONFIG_OPUS_BITRATE_CFG 32001
 
 // <o> Bit Rate Limit
 // <i> Set a bit rate limit that cannot be exceeded during the transmission. Must be equal or higher than the configured bit rate.
@@ -67,9 +69,9 @@
 //  <144000=>144 kbit/s
 //  <160000=>160 kbit/s
 /**@brief Opus Options: Bit Rate Limit */
-#define CONFIG_OPUS_BITRATE_LIMIT 40000
+// #define CONFIG_OPUS_BITRATE_LIMIT 40000
 
 // <o> Complexity <0-10>
 // <i> A number from range 0-10. Higher complexity assures better quality but also higher CPU and memory resources consumption.
 /**@brief Opus Options: Complexity <0-10> */
-#define CONFIG_OPUS_COMPLEXITY 0
+// #define CONFIG_OPUS_COMPLEXITY 0

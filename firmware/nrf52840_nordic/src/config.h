@@ -3,10 +3,10 @@
 // #define SAMPLE_RATE 16000
 #define MIC_GAIN 64
 #define MIC_IRC_PRIORITY 7
-#define MIC_BUFFER_SAMPLES 1600         // 100ms
-#define AUDIO_BUFFER_SAMPLES 16000      // 1s
-#define NETWORK_RING_BUF_SIZE 32 * 1024 // 32KB
-#define MINIMAL_PACKET_SIZE 100         // Less than that doesn't make sence to send anything at all
+#define MIC_BUFFER_SAMPLES 1600    // 100ms
+#define AUDIO_BUFFER_SAMPLES 16000 // 1s
+#define NETWORK_RING_BUF_SIZE 32   // number of frames * CODEC_OUTPUT_MAX_BYTES
+#define MINIMAL_PACKET_SIZE 100    // Less than that doesn't make sence to send anything at all
 // #define ENABLE_L2CAP 1
 
 // PIN definitions
@@ -34,12 +34,12 @@
 #if CODEC_OPUS
 #define CODEC_DIVIDER 1
 #define CODEC_PACKAGE_SAMPLES 80    // 5ms
-#define CODEC_OUTPUT_MAX_BYTES 3840 // ???
+#define CODEC_OUTPUT_MAX_BYTES 1024 // ???
 #define CODEC_OPUS_APPLICATION OPUS_APPLICATION_RESTRICTED_LOWDELAY
 #define CODEC_OPUS_BITRATE 24000
 #define CODEC_OPUS_VBR 0 // Or 1
 #define CODEC_OPUS_COMPLEXITY 4
-
+#define CONFIG_OPUS_MODE CONFIG_OPUS_MODE_CELT
 #endif
 
 // Codec IDs

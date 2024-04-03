@@ -6,7 +6,6 @@ from datetime import datetime
 import numpy as np
 import time
 import os
-import audioop
 import struct
 from scipy.signal import stft, istft
 
@@ -15,7 +14,7 @@ SERVICE_UUID = "19B10000-E8F2-537E-4F6C-D104768A1214"
 CHARACTERISTIC_UUID = "19B10001-E8F2-537E-4F6C-D104768A1214"
 
 CODEC = "mulaw"  # "pcm" or "mulaw" 
-SAMPLE_RATE = 16000  # Sample rate for the audio
+SAMPLE_RATE = 8000  # Sample rate for the audio
 SAMPLE_WIDTH = 2  # 16-bit audio
 CHANNELS = 1  # Mono audio
 CAPTURE_TIME = 10  # Time to capture audio in seconds
@@ -71,9 +70,10 @@ async def main():
     def filter_audio_data(audio_data):
         
         if CODEC == "mulaw":
-            pcm16_samples = audioop.ulaw2lin(audio_data, 2)
-            pcm16_samples = struct.unpack('<' + 'h' * (len(pcm16_samples) // 2), pcm16_samples)
-            print(pcm16_samples)
+            # pcm16_samples = audioop.ulaw2lin(audio_data, 2)
+            # pcm16_samples = struct.unpack('<' + 'h' * (len(pcm16_samples) // 2), pcm16_samples)
+            # print(pcm16_samples)
+            pcm16_samples = ulaw_bytes_to_pcm16(audio_data)
             audio_data = np.array(pcm16_samples, dtype=np.int16)
 
         if CODEC == "pcm":
@@ -126,7 +126,7 @@ async def main():
         def handle_audio_data(sender, data):
             # print("---handle_audio_data---")
             # print(f"Received {len(data)} bytes at {time.time()}")
-            audio_data.extend(data)
+            audio_data.extend(data[3:])
             # if data == [end_signal]:
             #     print(f"End signal received after {len(audio_data)} bytes")
             

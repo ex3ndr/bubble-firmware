@@ -196,6 +196,7 @@ static bool read_from_tx_queue()
 {
 
     // Read from ring buffer
+    // memset(tx_buffer, 0, sizeof(tx_buffer));
     tx_buffer_size = ring_buf_get(&ring_buf, tx_buffer, (CODEC_OUTPUT_MAX_BYTES + RING_BUFFER_HEADER_SIZE)); // It always fits completely or not at all
     if (tx_buffer_size != (CODEC_OUTPUT_MAX_BYTES + RING_BUFFER_HEADER_SIZE))
     {
@@ -228,7 +229,8 @@ static bool push_to_gatt(struct bt_conn *conn)
     }
 
     // Push each frame
-    uint32_t offset = RING_BUFFER_HEADER_SIZE; // Skip header
+    uint8_t *buffer = tx_buffer + RING_BUFFER_HEADER_SIZE;
+    uint32_t offset = 0;
     uint8_t index = 0;
     while (offset < tx_buffer_size)
     {
@@ -238,7 +240,7 @@ static bool push_to_gatt(struct bt_conn *conn)
         pusher_temp_data[0] = id & 0xFF;
         pusher_temp_data[1] = (id >> 8) & 0xFF;
         pusher_temp_data[2] = index;
-        memcpy(pusher_temp_data + NET_BUFFER_HEADER_SIZE, tx_buffer + offset, packet_size);
+        memcpy(pusher_temp_data + NET_BUFFER_HEADER_SIZE, buffer + offset, packet_size);
         offset += packet_size;
         index++;
 
@@ -369,7 +371,6 @@ struct bt_conn *get_current_connection()
 
 int broadcast_audio_packets(uint8_t *buffer, size_t size)
 {
-    // printk("broadcast_audio_packets %d\n", size);
     while (!write_to_tx_queue(buffer, size))
     {
         k_sleep(K_MSEC(1));

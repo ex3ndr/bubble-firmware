@@ -370,13 +370,9 @@ struct bt_conn *get_current_connection()
 int broadcast_audio_packets(uint8_t *buffer, size_t size)
 {
     // printk("broadcast_audio_packets %d\n", size);
-    if (!write_to_tx_queue(buffer, size))
+    while (!write_to_tx_queue(buffer, size))
     {
-        printk("Failed to write to tx queue\n");
-        return -1;
+        k_sleep(K_MSEC(1));
     }
-    else
-    {
-        return 0;
-    }
+    return 0;
 }

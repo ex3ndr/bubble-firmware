@@ -108,7 +108,7 @@ int codec_start()
 
     // Thread
     ring_buf_init(&codec_ring_buf, sizeof(codec_ring_buffer_data), codec_ring_buffer_data);
-    k_thread_create(&codec_thread, codec_stack, K_THREAD_STACK_SIZEOF(codec_stack), (k_thread_entry_t)codec_entry, NULL, NULL, NULL, K_PRIO_COOP(7), 0, K_NO_WAIT);
+    k_thread_create(&codec_thread, codec_stack, K_THREAD_STACK_SIZEOF(codec_stack), (k_thread_entry_t)codec_entry, NULL, NULL, NULL, K_PRIO_PREEMPT(4), 0, K_NO_WAIT);
 
     // Success
     return 0;

@@ -51,7 +51,7 @@ int main(void)
 	{
 		is_on = !is_on;
 		set_led_red(is_on);
-		k_msleep(1000);
+		k_msleep(500);
 	}
 
 	// Unreachable

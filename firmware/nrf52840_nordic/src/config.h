@@ -14,6 +14,9 @@
 #define PDM_CLK_PIN NRF_GPIO_PIN_MAP(1, 0)
 #define PDM_PWR_PIN NRF_GPIO_PIN_MAP(1, 10)
 
+// Camera
+// #define ENABLE_CAMERA 1
+
 // Codecs
 // #define CODEC_PCM 1
 #define CODEC_MU_LAW 1

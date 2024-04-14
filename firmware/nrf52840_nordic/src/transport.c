@@ -100,7 +100,7 @@ static void _transport_connected(struct bt_conn *conn, uint8_t err)
     current_mtu = info.le.data_len->tx_max_len;
     printk("Connected\n");
     printk("Interval: %d, latency: %d, timeout: %d\n", info.le.interval, info.le.latency, info.le.timeout);
-    printk("TX PHY %s, RX PHY %s\n", phy2str(info.le.phy->tx_phy), phy2str(info.le.phy->rx_phy));
+    // printk("TX PHY %s, RX PHY %s\n", phy2str(info.le.phy->tx_phy), phy2str(info.le.phy->rx_phy));
     printk("LE data len updated: TX (len: %d time: %d) RX (len: %d time: %d)\n", info.le.data_len->tx_max_len, info.le.data_len->tx_max_time, info.le.data_len->rx_max_len, info.le.data_len->rx_max_time);
 }
 
@@ -133,8 +133,8 @@ static void _le_param_updated(struct bt_conn *conn, uint16_t interval,
 static void _le_phy_updated(struct bt_conn *conn,
                             struct bt_conn_le_phy_info *param)
 {
-    printk("LE PHY updated: TX PHY %s, RX PHY %s\n",
-           phy2str(param->tx_phy), phy2str(param->rx_phy));
+    // printk("LE PHY updated: TX PHY %s, RX PHY %s\n",
+    //        phy2str(param->tx_phy), phy2str(param->rx_phy));
 }
 
 static void _le_data_length_updated(struct bt_conn *conn,

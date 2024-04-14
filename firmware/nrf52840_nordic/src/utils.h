@@ -2,6 +2,9 @@
 #include <zephyr/logging/log.h>
 #include <zephyr/bluetooth/gatt.h>
 
+static const struct device *gpio0_port = DEVICE_DT_GET(DT_NODELABEL(gpio0));
+static const struct device *gpio1_port = DEVICE_DT_GET(DT_NODELABEL(gpio1));
+
 #define ASSERT_OK(result)                                          \
     if ((result) < 0)                                              \
     {                                                              \

@@ -12,6 +12,7 @@ target_sources(app PRIVATE
     src/led.c
     src/audio.c
     src/codec.c
+    src/camera.c
     src/opus-1.2.1/A2NLSF.c
     src/opus-1.2.1/CNG.c
     src/opus-1.2.1/HP_variable_cutoff.c

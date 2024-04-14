@@ -6,6 +6,7 @@
 #include "config.h"
 #include "audio.h"
 #include "codec.h"
+#include "camera.h"
 
 static void codec_handler(uint8_t *data, size_t len)
 {
@@ -32,16 +33,19 @@ int main(void)
 	ASSERT_OK(led_start());
 	set_led_blue(true);
 
+	// Camera start
+	ASSERT_OK(camera_start());
+
 	// Transport start
-	ASSERT_OK(transport_start());
+	// ASSERT_OK(transport_start());
 
-	// Codec start
-	set_codec_callback(codec_handler);
-	ASSERT_OK(codec_start());
+	// // Codec start
+	// set_codec_callback(codec_handler);
+	// ASSERT_OK(codec_start());
 
-	// Mic start
-	set_mic_callback(mic_handler);
-	ASSERT_OK(mic_start());
+	// // Mic start
+	// set_mic_callback(mic_handler);
+	// ASSERT_OK(mic_start());
 
 	// Blink LED
 	bool is_on = true;
@@ -52,6 +56,7 @@ int main(void)
 		is_on = !is_on;
 		set_led_red(is_on);
 		k_msleep(500);
+		take_photo();
 	}
 
 	// Unreachable

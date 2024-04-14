@@ -119,7 +119,7 @@ static bool _le_param_req(struct bt_conn *conn, struct bt_le_conn_param *param)
            param->interval_min, param->interval_max);
     printk("Latency: %d, Timeout: %d\n", param->latency, param->timeout);
 
-    return true;
+    return false;
 }
 
 static void _le_param_updated(struct bt_conn *conn, uint16_t interval,

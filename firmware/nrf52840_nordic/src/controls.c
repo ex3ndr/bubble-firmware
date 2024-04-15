@@ -28,7 +28,7 @@ int start_controls()
     ASSERT_OK(gpio_pin_configure_dt(&button, GPIO_INPUT));
     gpio_init_callback(&button_cb_data, button_pressed, BIT(button.pin));
     ASSERT_OK(gpio_add_callback(button.port, &button_cb_data));
-    ASSERT_OK(gpio_pin_interrupt_configure_dt(&button, GPIO_INT_EDGE_TO_ACTIVE));
+    ASSERT_OK(gpio_pin_interrupt_configure_dt(&button, GPIO_INT_EDGE_BOTH));
 
     return 0;
 }

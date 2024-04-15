@@ -14,6 +14,7 @@ target_sources(app PRIVATE
     src/codec.c
     src/camera.c
     src/controls.c
+    src/battery.c
     src/opus-1.2.1/A2NLSF.c
     src/opus-1.2.1/CNG.c
     src/opus-1.2.1/HP_variable_cutoff.c

@@ -9,10 +9,12 @@
 #include "codec.h"
 #include "camera.h"
 #include "controls.h"
+#include "battery.h"
 
 // State
 bool is_recording = false;
 bool is_connected = false;
+void refresh_state_indication(bool tick);
 
 //
 // Transport callbacks
@@ -111,7 +113,15 @@ void refresh_state_indication(bool tick)
 		return;
 	}
 
-	// Not recording and no connection - no indication
+	// Not recording and no connection, but charging - WHITE
+	if (is_battery_charging()) {
+		set_led_red(true);
+		set_led_green(true);
+		set_led_blue(true);
+		return;
+	}
+
+	// Not recording and no connection - OFF
 	set_led_red(false);
 	set_led_green(false);
 	set_led_blue(false);
@@ -128,11 +138,8 @@ int main(void)
 	ASSERT_OK(led_start());
 	set_led_red(true);
 
-	// Controls
-#ifdef ENABLE_BUTTON
-	set_button_handler(on_button_pressed);
-	ASSERT_OK(start_controls());
-#endif
+	// Battery start
+	ASSERT_OK(battery_start());
 
 	// Camera start
 #ifdef ENABLE_CAMERA
@@ -146,6 +153,12 @@ int main(void)
 	set_allowed(true);
 #endif
 
+	// Controls
+#ifdef ENABLE_BUTTON
+	set_button_handler(on_button_pressed);
+	ASSERT_OK(start_controls());
+#endif
+
 	// Codec start
 	set_codec_callback(codec_handler);
 	ASSERT_OK(codec_start());
@@ -156,6 +169,17 @@ int main(void)
 
 	// Set LED
 	refresh_state_indication(true);
+
+	// Test
+	if (is_battery_charging())
+	{
+		printk("Battery is charging\n");
+	}
+	else
+	{
+		printk("Battery is not charging\n");
+	}
+	printk("Battery percentage: %d\n", get_battery_percentage());
 
 	// Main loop
 	bool tick = true;

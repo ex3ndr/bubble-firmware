@@ -1,15 +1,25 @@
+#include <zephyr/kernel.h>
 #include "controls.h"
 #include "utils.h"
 
 static button_handler button_cb = NULL;
 static struct gpio_callback button_cb_data;
-void button_pressed(const struct device *dev, struct gpio_callback *cb,
-                    uint32_t pins)
+
+static void cooldown_expired(struct k_work *work)
 {
-    if (button_cb)
+    ARG_UNUSED(work);
+    int val = gpio_pin_get_dt(&button);
+    if (val && button_cb)
     {
         button_cb();
     }
+}
+
+static K_WORK_DELAYABLE_DEFINE(cooldown_work, cooldown_expired);
+
+void button_pressed(const struct device *dev, struct gpio_callback *cb, uint32_t pins)
+{
+    k_work_reschedule(&cooldown_work, K_MSEC(15));
 }
 
 int start_controls()

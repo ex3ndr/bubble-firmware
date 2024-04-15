@@ -8,8 +8,65 @@
 #include "audio.h"
 #include "codec.h"
 #include "camera.h"
+#include "controls.h"
 
-static const struct gpio_dt_spec button = GPIO_DT_SPEC_GET_OR(DT_ALIAS(sw0), gpios, {0});
+// State
+bool is_recording = false;
+bool is_connected = false;
+
+//
+// Transport callbacks
+//
+
+static void transport_subscribed()
+{
+	is_connected = true;
+#ifndef ENABLE_BUTTON
+	is_recording = true;
+	mic_resume();
+#endif
+	refresh_state_indication(true);
+}
+
+static void transport_unsubscribed()
+{
+	is_connected = false;
+#ifndef ENABLE_BUTTON
+	is_recording = false;
+	mic_pause();
+#endif
+	refresh_state_indication(true);
+}
+
+static struct transport_cb transport_callbacks = {
+	.subscribed = transport_subscribed,
+	.unsubscribed = transport_unsubscribed,
+};
+
+//
+// Button
+//
+
+#ifdef ENABLE_BUTTON
+static void on_button_pressed()
+{
+	is_recording = !is_recording;
+	set_allowed(is_recording);
+	if (is_recording)
+	{
+		mic_resume();
+	}
+	else
+	{
+		mic_pause();
+	}
+	refresh_state_indication(true);
+}
+#endif
+
+//
+// Audio Pipeline
+//
 
 static void codec_handler(uint8_t *data, size_t len)
 {
@@ -21,36 +78,61 @@ static void mic_handler(int16_t *buffer)
 	codec_receive_pcm(buffer, MIC_BUFFER_SAMPLES); // Errors are logged inside
 }
 
-void bt_ctlr_assert_handle(char *name, int type)
+//
+// LED indication
+//
+
+void refresh_state_indication(bool tick)
 {
-	if (name != NULL)
+	// Recording and connected state - BLUE
+	if (is_recording && is_connected)
 	{
-		printk("Bt assert-> %s", name);
+		set_led_red(false);
+		set_led_green(false);
+		set_led_blue(true);
+		return;
 	}
+
+	// Recording but lost connection - RED
+	if (is_recording && !is_connected)
+	{
+		set_led_red(true);
+		set_led_green(false);
+		set_led_blue(false);
+		return;
+	}
+
+	// Conencted, but not recording - BLINK BLUE
+	if (is_connected && !is_recording)
+	{
+		set_led_red(false);
+		set_led_green(false);
+		set_led_blue(tick);
+		return;
+	}
+
+	// Not recording and no connection - no indication
+	set_led_red(false);
+	set_led_green(false);
+	set_led_blue(false);
 }
 
-// Main loop
+//
+// Main
+//
+
 int main(void)
 {
-	// Button
-	if (!gpio_is_ready_dt(&button))
-	{
-		printk("Error: button device %s is not ready\n",
-			   button.port->name);
-		return 0;
-	}
-
-	int ret = gpio_pin_configure_dt(&button, GPIO_INPUT);
-	if (ret != 0)
-	{
-		printk("Error %d: failed to configure %s pin %d\n",
-			   ret, button.port->name, button.pin);
-		return 0;
-	}
 
 	// Led start
 	ASSERT_OK(led_start());
-	set_led_blue(true);
+	set_led_red(true);
+
+	// Controls
+#ifdef ENABLE_BUTTON
+	set_button_handler(on_button_pressed);
+	ASSERT_OK(start_controls());
+#endif
 
 	// Camera start
 #ifdef ENABLE_CAMERA
@@ -58,7 +140,11 @@ int main(void)
 #endif
 
 	// Transport start
+	set_transport_callbacks(&transport_callbacks);
 	ASSERT_OK(transport_start());
+#ifndef ENABLE_BUTTON
+	set_allowed(true);
+#endif
 
 	// Codec start
 	set_codec_callback(codec_handler);
@@ -68,29 +154,19 @@ int main(void)
 	set_mic_callback(mic_handler);
 	ASSERT_OK(mic_start());
 
-	// Blink LED
-	bool is_on = true;
-	set_led_blue(false);
-	set_led_red(is_on);
+	// Set LED
+	refresh_state_indication(true);
+
+	// Main loop
+	bool tick = true;
 	while (1)
 	{
-		is_on = !is_on;
-		printk("Button: %d\n", gpio_pin_get_dt(&button));
-		// if (gpio_pin_get(gpio0_port, 3) == 0)
-		// {
-		// 	set_led_red(is_on);
-		// 	set_led_green(false);
-		// } else {
-		// 	set_led_red(false);
-		// 	set_led_green(is_on);
-		// }
-		set_led_red(is_on);
+		// Wait for second
+		k_msleep(1000);
 
-		k_msleep(500);
-
-#ifdef ENABLE_CAMERA
-		take_photo();
-#endif
+		// Refresh state indication
+		tick = !tick;
+		refresh_state_indication(tick);
 	}
 
 	// Unreachable

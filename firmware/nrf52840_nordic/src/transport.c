@@ -14,9 +14,12 @@
 // Internal
 //
 
+static bool is_allowed = false;
+static struct transport_cb *external_callbacks = NULL;
 static struct bt_conn_cb _callback_references;
 static ssize_t audio_characteristic_read(struct bt_conn *conn, const struct bt_gatt_attr *attr, void *buf, uint16_t len, uint16_t offset);
 static ssize_t audio_characteristic_format_read(struct bt_conn *conn, const struct bt_gatt_attr *attr, void *buf, uint16_t len, uint16_t offset);
+static ssize_t audio_characteristic_allowed_read(struct bt_conn *conn, const struct bt_gatt_attr *attr, void *buf, uint16_t len, uint16_t offset);
 static void ccc_config_changed_handler(const struct bt_gatt_attr *attr, uint16_t value);
 
 //
@@ -26,12 +29,13 @@ static void ccc_config_changed_handler(const struct bt_gatt_attr *attr, uint16_t
 static struct bt_uuid_128 audio_service_uuid = BT_UUID_INIT_128(BT_UUID_128_ENCODE(0x19B10000, 0xE8F2, 0x537E, 0x4F6C, 0xD104768A1214));
 static struct bt_uuid_128 audio_characteristic_uuid = BT_UUID_INIT_128(BT_UUID_128_ENCODE(0x19B10001, 0xE8F2, 0x537E, 0x4F6C, 0xD104768A1214));
 static struct bt_uuid_128 audio_characteristic_format_uuid = BT_UUID_INIT_128(BT_UUID_128_ENCODE(0x19B10002, 0xE8F2, 0x537E, 0x4F6C, 0xD104768A1214));
+static struct bt_uuid_128 audio_characteristic_allow_uuid = BT_UUID_INIT_128(BT_UUID_128_ENCODE(0x19B10003, 0xE8F2, 0x537E, 0x4F6C, 0xD104768A1214));
 static struct bt_gatt_attr attrs[] = {
     BT_GATT_PRIMARY_SERVICE(&audio_service_uuid),
     BT_GATT_CHARACTERISTIC(&audio_characteristic_uuid.uuid, BT_GATT_CHRC_READ | BT_GATT_CHRC_NOTIFY, BT_GATT_PERM_READ, audio_characteristic_read, NULL, NULL),
     BT_GATT_CCC(ccc_config_changed_handler, BT_GATT_PERM_READ | BT_GATT_PERM_WRITE),
     BT_GATT_CHARACTERISTIC(&audio_characteristic_format_uuid.uuid, BT_GATT_CHRC_READ, BT_GATT_PERM_READ, audio_characteristic_format_read, NULL, NULL),
-};
+    BT_GATT_CHARACTERISTIC(&audio_characteristic_allow_uuid.uuid, BT_GATT_CHRC_READ | BT_GATT_CHRC_NOTIFY, BT_GATT_PERM_READ, audio_characteristic_allowed_read, NULL, NULL)};
 static struct bt_gatt_service audio_service = BT_GATT_SERVICE(attrs);
 
 // Advertisement data
@@ -66,15 +70,30 @@ static ssize_t audio_characteristic_format_read(struct bt_conn *conn, const stru
     return bt_gatt_attr_read(conn, attr, buf, len, offset, value, sizeof(value));
 }
 
+static ssize_t audio_characteristic_allowed_read(struct bt_conn *conn, const struct bt_gatt_attr *attr, void *buf, uint16_t len, uint16_t offset)
+{
+    printk("audio_characteristic_allowed_read\n");
+    uint8_t value[1] = {(is_allowed ? 1 : 0)};
+    return bt_gatt_attr_read(conn, attr, buf, len, offset, value, sizeof(value));
+}
+
 static void ccc_config_changed_handler(const struct bt_gatt_attr *attr, uint16_t value)
 {
     if (value == BT_GATT_CCC_NOTIFY)
     {
         printk("Client subscribed for notifications\n");
+        if (external_callbacks && external_callbacks->subscribed)
+        {
+            external_callbacks->subscribed();
+        }
     }
     else if (value == 0)
     {
         printk("Client unsubscribed from notifications\n");
+        if (external_callbacks && external_callbacks->unsubscribed)
+        {
+            external_callbacks->unsubscribed();
+        }
     }
     else
     {
@@ -208,6 +227,13 @@ static bool read_from_tx_queue()
     tx_buffer_size = tx_buffer[0] + (tx_buffer[1] << 8);
 
     return true;
+}
+
+void set_allowed(bool allowed)
+{
+    is_allowed = allowed;
+    uint8_t value[1] = {(is_allowed ? 1 : 0)};
+    bt_gatt_notify(NULL, &audio_service.attrs[1], value, 1);
 }
 
 //
@@ -376,4 +402,9 @@ int broadcast_audio_packets(uint8_t *buffer, size_t size)
         k_sleep(K_MSEC(1));
     }
     return 0;
+}
+
+void set_transport_callbacks(struct transport_cb *_callbacks)
+{
+    external_callbacks = _callbacks;
 }

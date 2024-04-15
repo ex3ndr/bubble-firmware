@@ -82,18 +82,36 @@ int mic_start()
     // Power on Mic
     nrfy_gpio_cfg_output(PDM_PWR_PIN);
     nrfy_gpio_pin_set(PDM_PWR_PIN);
-
-    // Start PDM
-    if (nrfx_pdm_start() != NRFX_SUCCESS)
-    {
-        printk("Unable to start PDM\n");
-        return -1;
-    }
-
+    
     printk("Microphone started\n");
     return 0;
 }
 
-void set_mic_callback(mix_handler callback) {
+int mic_resume()
+{
+    if (nrfx_pdm_start() != NRFX_SUCCESS)
+    {
+        printk("Unable to resume PDM\n");
+        return -1;
+    }
+
+    printk("Microphone resumed\n");
+    return 0;
+}
+
+int mic_pause()
+{
+    if (nrfx_pdm_stop() != NRFX_SUCCESS)
+    {
+        printk("Unable to pause PDM\n");
+        return -1;
+    }
+
+    printk("Microphone paused\n");
+    return 0;
+}
+
+void set_mic_callback(mix_handler callback)
+{
     _callback = callback;
 }

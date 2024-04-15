@@ -17,6 +17,9 @@
 // Camera
 // #define ENABLE_CAMERA 1
 
+// Button
+#define ENABLE_BUTTON 1
+
 // Codecs
 // #define CODEC_PCM 1
 #define CODEC_MU_LAW 1

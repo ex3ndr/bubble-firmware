@@ -5,6 +5,7 @@
 #include <zephyr/bluetooth/uuid.h>
 #include <zephyr/bluetooth/gatt.h>
 #include <zephyr/bluetooth/l2cap.h>
+#include <zephyr/bluetooth/services/bas.h>
 #include <zephyr/sys/atomic.h>
 #include "transport.h"
 #include "config.h"
@@ -15,6 +16,7 @@
 //
 
 static uint8_t battery_level = 100U;
+static bool battery_charging = false;
 static bool is_allowed = false;
 static struct transport_cb *external_callbacks = NULL;
 static struct bt_conn_cb _callback_references;
@@ -44,19 +46,46 @@ static struct bt_gatt_attr audio_attrs[] = {
     BT_GATT_CHARACTERISTIC(&audio_characteristic_format_uuid.uuid, BT_GATT_CHRC_READ, BT_GATT_PERM_READ, audio_characteristic_format_read, NULL, NULL),
     // Mute
     BT_GATT_CHARACTERISTIC(&audio_characteristic_allow_uuid.uuid, BT_GATT_CHRC_READ | BT_GATT_CHRC_NOTIFY, BT_GATT_PERM_READ, audio_characteristic_allowed_read, NULL, NULL),
-    BT_GATT_CCC(mute_ccc_config_changed_handler, BT_GATT_PERM_READ | BT_GATT_PERM_WRITE),
-    // Battery
-    BT_GATT_CHARACTERISTIC(&audio_characteristic_battery.uuid, BT_GATT_CHRC_READ | BT_GATT_CHRC_NOTIFY, BT_GATT_PERM_READ, battery_characteristic_read, NULL, NULL),
-    BT_GATT_CCC(battery_ccc_config_changed_handler, BT_GATT_PERM_READ | BT_GATT_PERM_WRITE)};
+    BT_GATT_CCC(mute_ccc_config_changed_handler, BT_GATT_PERM_READ | BT_GATT_PERM_WRITE)};
 static struct bt_gatt_service audio_service = BT_GATT_SERVICE(audio_attrs);
 
+//
+// Battery Service
+//
+
+static const struct bt_gatt_cpf level_cpf = {
+    .format = 0x04, /* uint8 */
+    .exponent = 0x0,
+    .unit = 0x27AD,        /* Percentage */
+    .name_space = 0x01,    /* Bluetooth SIG */
+    .description = 0x0106, /* "main" */
+};
+
+static struct bt_gatt_attr bas_attrs[] = {
+    BT_GATT_PRIMARY_SERVICE(BT_UUID_BAS),
+    BT_GATT_CHARACTERISTIC(BT_UUID_BAS_BATTERY_LEVEL,
+                           BT_GATT_CHRC_READ | BT_GATT_CHRC_NOTIFY,
+                           BT_GATT_PERM_READ, battery_characteristic_read, NULL,
+                           &battery_level),
+    BT_GATT_CCC(battery_ccc_config_changed_handler,
+                BT_GATT_PERM_READ | BT_GATT_PERM_WRITE),
+    BT_GATT_CPF(&level_cpf),
+};
+static struct bt_gatt_service bas_service = BT_GATT_SERVICE(bas_attrs);
+
+//
 // Advertisement data
+//
+
 static const struct bt_data bt_ad[] = {
     BT_DATA_BYTES(BT_DATA_FLAGS, (BT_LE_AD_GENERAL | BT_LE_AD_NO_BREDR)),
     BT_DATA(BT_DATA_NAME_COMPLETE, "Super", sizeof("Super") - 1),
 };
 
+//
 // Scan response data
+//
+
 static const struct bt_data bt_sd[] = {
     BT_DATA(BT_DATA_UUID128_ALL, audio_service_uuid.val, sizeof(audio_service_uuid.val)),
 };
@@ -280,13 +309,6 @@ static bool read_from_tx_queue()
     return true;
 }
 
-void set_allowed(bool allowed)
-{
-    is_allowed = allowed;
-    uint8_t value[1] = {(is_allowed ? 1 : 0)};
-    bt_gatt_notify(NULL, &audio_service.attrs[1], value, 1);
-}
-
 //
 // Pusher
 //
@@ -423,6 +445,7 @@ int transport_start()
 
     // Start advertising
     bt_gatt_service_register(&audio_service);
+    bt_gatt_service_register(&bas_service);
     err = bt_le_adv_start(BT_LE_ADV_CONN, bt_ad, ARRAY_SIZE(bt_ad), bt_sd, ARRAY_SIZE(bt_sd));
     if (err)
     {
@@ -460,17 +483,21 @@ void set_transport_callbacks(struct transport_cb *_callbacks)
     external_callbacks = _callbacks;
 }
 
+void set_allowed(bool allowed)
+{
+    if (is_allowed != allowed)
+    {
+        is_allowed = allowed;
+        uint8_t value[1] = {(is_allowed ? 1 : 0)};
+        bt_gatt_notify(NULL, &audio_service.attrs[4], &value, 1);
+    }
+}
+
 void set_bt_batterylevel(uint8_t level)
 {
-    battery_level = level;
-    struct bt_conn *conn = current_connection;
-    if (conn)
+    if (battery_level != level)
     {
-        conn = bt_conn_ref(conn);
-        if (bt_gatt_is_subscribed(conn, &audio_service.attrs[6], BT_GATT_CCC_NOTIFY))
-        {
-            bt_gatt_notify(conn, &audio_service.attrs[6], &level, sizeof(level));
-        }
-        bt_conn_unref(conn);
+        battery_level = level;
+        bt_gatt_notify(NULL, &bas_service.attrs[1], &level, sizeof(level));
     }
 }

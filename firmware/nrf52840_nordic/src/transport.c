@@ -489,7 +489,7 @@ void set_allowed(bool allowed)
     {
         is_allowed = allowed;
         uint8_t value[1] = {(is_allowed ? 1 : 0)};
-        bt_gatt_notify(NULL, &audio_service.attrs[4], &value, 1);
+        bt_gatt_notify(NULL, &audio_service.attrs[6], &value, 1);
     }
 }
 

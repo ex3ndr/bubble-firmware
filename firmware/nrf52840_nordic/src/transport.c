@@ -14,29 +14,41 @@
 // Internal
 //
 
+static uint8_t battery_level = 100U;
 static bool is_allowed = false;
 static struct transport_cb *external_callbacks = NULL;
 static struct bt_conn_cb _callback_references;
 static ssize_t audio_characteristic_read(struct bt_conn *conn, const struct bt_gatt_attr *attr, void *buf, uint16_t len, uint16_t offset);
 static ssize_t audio_characteristic_format_read(struct bt_conn *conn, const struct bt_gatt_attr *attr, void *buf, uint16_t len, uint16_t offset);
 static ssize_t audio_characteristic_allowed_read(struct bt_conn *conn, const struct bt_gatt_attr *attr, void *buf, uint16_t len, uint16_t offset);
+static ssize_t battery_characteristic_read(struct bt_conn *conn, const struct bt_gatt_attr *attr, void *buf, uint16_t len, uint16_t offset);
 static void ccc_config_changed_handler(const struct bt_gatt_attr *attr, uint16_t value);
+static void battery_ccc_config_changed_handler(const struct bt_gatt_attr *attr, uint16_t value);
+static void mute_ccc_config_changed_handler(const struct bt_gatt_attr *attr, uint16_t value);
 
 //
-// Service and Characteristic
+// Audio Service
 //
 
 static struct bt_uuid_128 audio_service_uuid = BT_UUID_INIT_128(BT_UUID_128_ENCODE(0x19B10000, 0xE8F2, 0x537E, 0x4F6C, 0xD104768A1214));
 static struct bt_uuid_128 audio_characteristic_uuid = BT_UUID_INIT_128(BT_UUID_128_ENCODE(0x19B10001, 0xE8F2, 0x537E, 0x4F6C, 0xD104768A1214));
 static struct bt_uuid_128 audio_characteristic_format_uuid = BT_UUID_INIT_128(BT_UUID_128_ENCODE(0x19B10002, 0xE8F2, 0x537E, 0x4F6C, 0xD104768A1214));
 static struct bt_uuid_128 audio_characteristic_allow_uuid = BT_UUID_INIT_128(BT_UUID_128_ENCODE(0x19B10003, 0xE8F2, 0x537E, 0x4F6C, 0xD104768A1214));
-static struct bt_gatt_attr attrs[] = {
+static struct bt_uuid_128 audio_characteristic_battery = BT_UUID_INIT_128(BT_UUID_128_ENCODE(0x19B10004, 0xE8F2, 0x537E, 0x4F6C, 0xD104768A1214));
+static struct bt_gatt_attr audio_attrs[] = {
     BT_GATT_PRIMARY_SERVICE(&audio_service_uuid),
+    // Streaming
     BT_GATT_CHARACTERISTIC(&audio_characteristic_uuid.uuid, BT_GATT_CHRC_READ | BT_GATT_CHRC_NOTIFY, BT_GATT_PERM_READ, audio_characteristic_read, NULL, NULL),
     BT_GATT_CCC(ccc_config_changed_handler, BT_GATT_PERM_READ | BT_GATT_PERM_WRITE),
+    // Format
     BT_GATT_CHARACTERISTIC(&audio_characteristic_format_uuid.uuid, BT_GATT_CHRC_READ, BT_GATT_PERM_READ, audio_characteristic_format_read, NULL, NULL),
-    BT_GATT_CHARACTERISTIC(&audio_characteristic_allow_uuid.uuid, BT_GATT_CHRC_READ | BT_GATT_CHRC_NOTIFY, BT_GATT_PERM_READ, audio_characteristic_allowed_read, NULL, NULL)};
-static struct bt_gatt_service audio_service = BT_GATT_SERVICE(attrs);
+    // Mute
+    BT_GATT_CHARACTERISTIC(&audio_characteristic_allow_uuid.uuid, BT_GATT_CHRC_READ | BT_GATT_CHRC_NOTIFY, BT_GATT_PERM_READ, audio_characteristic_allowed_read, NULL, NULL),
+    BT_GATT_CCC(mute_ccc_config_changed_handler, BT_GATT_PERM_READ | BT_GATT_PERM_WRITE),
+    // Battery
+    BT_GATT_CHARACTERISTIC(&audio_characteristic_battery.uuid, BT_GATT_CHRC_READ | BT_GATT_CHRC_NOTIFY, BT_GATT_PERM_READ, battery_characteristic_read, NULL, NULL),
+    BT_GATT_CCC(battery_ccc_config_changed_handler, BT_GATT_PERM_READ | BT_GATT_PERM_WRITE)};
+static struct bt_gatt_service audio_service = BT_GATT_SERVICE(audio_attrs);
 
 // Advertisement data
 static const struct bt_data bt_ad[] = {
@@ -77,6 +89,13 @@ static ssize_t audio_characteristic_allowed_read(struct bt_conn *conn, const str
     return bt_gatt_attr_read(conn, attr, buf, len, offset, value, sizeof(value));
 }
 
+static ssize_t battery_characteristic_read(struct bt_conn *conn, const struct bt_gatt_attr *attr, void *buf, uint16_t len, uint16_t offset)
+{
+    printk("battery_characteristic_read\n");
+    uint8_t value[1] = {battery_level};
+    return bt_gatt_attr_read(conn, attr, buf, len, offset, &value, sizeof(value));
+}
+
 static void ccc_config_changed_handler(const struct bt_gatt_attr *attr, uint16_t value)
 {
     if (value == BT_GATT_CCC_NOTIFY)
@@ -94,6 +113,38 @@ static void ccc_config_changed_handler(const struct bt_gatt_attr *attr, uint16_t
         {
             external_callbacks->unsubscribed();
         }
+    }
+    else
+    {
+        printk("Invalid CCC value: %u\n", value);
+    }
+}
+
+static void battery_ccc_config_changed_handler(const struct bt_gatt_attr *attr, uint16_t value)
+{
+    if (value == BT_GATT_CCC_NOTIFY)
+    {
+        printk("Client subscribed for battery updates\n");
+    }
+    else if (value == 0)
+    {
+        printk("Client unsubscribed from battery updates\n");
+    }
+    else
+    {
+        printk("Invalid CCC value: %u\n", value);
+    }
+}
+
+static void mute_ccc_config_changed_handler(const struct bt_gatt_attr *attr, uint16_t value)
+{
+    if (value == BT_GATT_CCC_NOTIFY)
+    {
+        printk("Client subscribed for mute updates\n");
+    }
+    else if (value == 0)
+    {
+        printk("Client unsubscribed from mute updates\n");
     }
     else
     {
@@ -407,4 +458,19 @@ int broadcast_audio_packets(uint8_t *buffer, size_t size)
 void set_transport_callbacks(struct transport_cb *_callbacks)
 {
     external_callbacks = _callbacks;
+}
+
+void set_bt_batterylevel(uint8_t level)
+{
+    battery_level = level;
+    struct bt_conn *conn = current_connection;
+    if (conn)
+    {
+        conn = bt_conn_ref(conn);
+        if (bt_gatt_is_subscribed(conn, &audio_service.attrs[6], BT_GATT_CCC_NOTIFY))
+        {
+            bt_gatt_notify(conn, &audio_service.attrs[6], &level, sizeof(level));
+        }
+        bt_conn_unref(conn);
+    }
 }

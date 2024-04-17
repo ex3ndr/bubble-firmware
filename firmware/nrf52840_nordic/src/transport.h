@@ -12,3 +12,4 @@ struct transport_cb
 };
 void set_transport_callbacks(struct transport_cb *_callbacks);
 void set_allowed(bool allowed);
+void set_bt_batterylevel(uint8_t level);

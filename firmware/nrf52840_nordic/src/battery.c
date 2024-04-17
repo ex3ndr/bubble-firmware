@@ -2,8 +2,9 @@
 #include <zephyr/drivers/gpio.h>
 #include <zephyr/drivers/adc.h>
 #include <zephyr/bluetooth/services/bas.h>
-#import "battery.h"
-#import "utils.h"
+#include "battery.h"
+#include "utils.h"
+#include "transport.h"
 
 #define GPIO_BATTERY_CHARGING_STATUS 17
 #define GPIO_BATTERY_CHARGE_SPEED 13
@@ -152,7 +153,7 @@ void refresh_worker(struct k_work *work)
     {
         battery_voltage = read_battery_voltage();
         battery_percentage = battery_milivolt_to_percent(battery_voltage);
-        bt_bas_set_battery_level(battery_percentage);
+        set_bt_batterylevel(battery_percentage);
         voltage_counter = 0;
     }
     voltage_counter++;
@@ -186,7 +187,7 @@ int battery_start()
     battery_status_charge = read_battery_charging();
     battery_voltage = read_battery_voltage();
     battery_percentage = battery_milivolt_to_percent(battery_voltage);
-    bt_bas_set_battery_level(battery_percentage);
+    set_bt_batterylevel(battery_percentage);
 
     // Start worker
     k_work_schedule(&refresh_work, K_MSEC(1000));

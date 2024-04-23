@@ -30,7 +30,7 @@ int codec_receive_pcm(int16_t *data, size_t len)
     int written = ring_buf_put(&codec_ring_buf, (uint8_t *)data, len * 2);
     if (written != len * 2)
     {
-        printk("Failed to write %d bytes to codec ring buffer\n", len * 2);
+        // printk("Failed to write %d bytes to codec ring buffer\n", len * 2);
         return -1;
     }
     return 0;

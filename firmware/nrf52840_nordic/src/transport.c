@@ -299,7 +299,7 @@ static bool read_from_tx_queue()
     tx_buffer_size = ring_buf_get(&ring_buf, tx_buffer, (CODEC_OUTPUT_MAX_BYTES + RING_BUFFER_HEADER_SIZE)); // It always fits completely or not at all
     if (tx_buffer_size != (CODEC_OUTPUT_MAX_BYTES + RING_BUFFER_HEADER_SIZE))
     {
-        printk("Failed to read from ring buffer %d\n", tx_buffer_size);
+        // printk("Failed to read from ring buffer %d\n", tx_buffer_size);
         return false;
     }
 

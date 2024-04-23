@@ -11,6 +11,7 @@
 #include "camera.h"
 #include "controls.h"
 #include "battery.h"
+#include "settings.h"
 
 // State
 bool is_recording = false;
@@ -56,6 +57,7 @@ static void on_button_pressed()
 {
 	is_recording = !is_recording;
 	set_allowed(is_recording);
+	settings_write_enable(is_recording);
 	if (is_recording)
 	{
 		mic_resume();
@@ -106,15 +108,6 @@ void refresh_state_indication()
 		return;
 	}
 
-	// Conencted, but not recording - BLINK BLUE
-	// if (is_connected && !is_recording)
-	// {
-	// 	set_led_red(false);
-	// 	set_led_green(false);
-	// 	set_led_blue(tick);
-	// 	return;
-	// }
-
 	// Not recording, but charging - WHITE
 	if (is_charging)
 	{
@@ -149,6 +142,12 @@ int main(void)
 	// Led start
 	ASSERT_OK(led_start());
 
+	// Settings start
+	ASSERT_OK(settings_start());
+#ifdef ENABLE_BUTTON
+	is_recording = settings_read_enable();
+#endif
+
 	// Battery start
 	ASSERT_OK(battery_start());
 
@@ -177,6 +176,12 @@ int main(void)
 	// Mic start
 	set_mic_callback(mic_handler);
 	ASSERT_OK(mic_start());
+#ifdef ENABLE_BUTTON
+	if (is_recording)
+	{
+		mic_resume();
+	}
+#endif
 
 	// Set LED
 	is_charging = is_battery_charging();

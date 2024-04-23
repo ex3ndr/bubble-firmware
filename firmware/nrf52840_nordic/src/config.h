@@ -1,7 +1,8 @@
 #include <haly/nrfy_gpio.h>
 
 // #define SAMPLE_RATE 16000
-#define MIC_GAIN 64
+#define WDT_TIMEOUT_MS 4000 // Must be bigger than one second
+#define MIC_GAIN 80
 #define MIC_IRC_PRIORITY 7
 #define MIC_BUFFER_SAMPLES 1600    // 100ms
 #define AUDIO_BUFFER_SAMPLES 16000 // 1s

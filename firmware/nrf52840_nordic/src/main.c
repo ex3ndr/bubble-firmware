@@ -1,4 +1,5 @@
 #include <zephyr/kernel.h>
+#include <zephyr/drivers/watchdog.h>
 #include <zephyr/drivers/gpio.h>
 #include "transport.h"
 #include "mic.h"
@@ -114,7 +115,8 @@ void refresh_state_indication(bool tick)
 	}
 
 	// Not recording and no connection, but charging - WHITE
-	if (is_battery_charging()) {
+	if (is_battery_charging())
+	{
 		set_led_red(true);
 		set_led_green(true);
 		set_led_blue(true);
@@ -133,10 +135,18 @@ void refresh_state_indication(bool tick)
 
 int main(void)
 {
+	// Start watchdog
+	int err;
+	struct wdt_timeout_cfg wdt_config;
+	const struct device *wdt_dev = DEVICE_DT_GET(DT_NODELABEL(wdt));
+	wdt_config.flags = WDT_FLAG_RESET_SOC;
+	wdt_config.window.min = 0;
+	wdt_config.window.max = WDT_TIMEOUT_MS;
+	wdt_config.callback = NULL; // Set to NULL to cause a system reset
+	ASSERT_OK(wdt_install_timeout(wdt_dev, &wdt_config));
 
 	// Led start
 	ASSERT_OK(led_start());
-	set_led_red(true);
 
 	// Battery start
 	ASSERT_OK(battery_start());
@@ -182,6 +192,7 @@ int main(void)
 	printk("Battery percentage: %d\n", get_battery_percentage());
 
 	// Main loop
+	ASSERT_OK(wdt_setup(wdt_dev, WDT_OPT_PAUSE_HALTED_BY_DBG));
 	bool tick = true;
 	while (1)
 	{
@@ -191,6 +202,9 @@ int main(void)
 		// Refresh state indication
 		tick = !tick;
 		refresh_state_indication(tick);
+
+		// Watchdog
+		wdt_feed(wdt_dev, 0);
 	}
 
 	// Unreachable

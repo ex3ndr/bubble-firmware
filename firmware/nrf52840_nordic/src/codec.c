@@ -30,7 +30,7 @@ int codec_receive_pcm(int16_t *data, size_t len)
     int written = ring_buf_put(&codec_ring_buf, (uint8_t *)data, len * 2);
     if (written != len * 2)
     {
-        // printk("Failed to write %d bytes to codec ring buffer\n", len * 2);
+        printk("Failed to write %d/%d bytes to codec ring buffer\n", written, len * 2);
         return -1;
     }
     return 0;
@@ -90,7 +90,7 @@ void codec_entry()
 
 int codec_start()
 {
-    
+
 // OPUS
 #if CODEC_OPUS
     ASSERT_TRUE(opus_encoder_get_size(1) == sizeof(m_opus_encoder));

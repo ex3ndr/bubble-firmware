@@ -15,7 +15,8 @@
 // State
 bool is_recording = false;
 bool is_connected = false;
-void refresh_state_indication(bool tick);
+bool is_charging = false;
+void refresh_state_indication();
 
 //
 // Transport callbacks
@@ -28,7 +29,7 @@ static void transport_subscribed()
 	is_recording = true;
 	mic_resume();
 #endif
-	refresh_state_indication(true);
+	refresh_state_indication();
 }
 
 static void transport_unsubscribed()
@@ -38,7 +39,7 @@ static void transport_unsubscribed()
 	is_recording = false;
 	mic_pause();
 #endif
-	refresh_state_indication(true);
+	refresh_state_indication();
 }
 
 static struct transport_cb transport_callbacks = {
@@ -63,7 +64,7 @@ static void on_button_pressed()
 	{
 		mic_pause();
 	}
-	refresh_state_indication(true);
+	refresh_state_indication();
 }
 #endif
 
@@ -85,7 +86,7 @@ static void mic_handler(int16_t *buffer)
 // LED indication
 //
 
-void refresh_state_indication(bool tick)
+void refresh_state_indication()
 {
 	// Recording and connected state - BLUE
 	if (is_recording && is_connected)
@@ -106,16 +107,16 @@ void refresh_state_indication(bool tick)
 	}
 
 	// Conencted, but not recording - BLINK BLUE
-	if (is_connected && !is_recording)
-	{
-		set_led_red(false);
-		set_led_green(false);
-		set_led_blue(tick);
-		return;
-	}
+	// if (is_connected && !is_recording)
+	// {
+	// 	set_led_red(false);
+	// 	set_led_green(false);
+	// 	set_led_blue(tick);
+	// 	return;
+	// }
 
-	// Not recording and no connection, but charging - WHITE
-	if (is_battery_charging())
+	// Not recording, but charging - WHITE
+	if (is_charging)
 	{
 		set_led_red(true);
 		set_led_green(true);
@@ -123,7 +124,7 @@ void refresh_state_indication(bool tick)
 		return;
 	}
 
-	// Not recording and no connection - OFF
+	// Not recording - OFF
 	set_led_red(false);
 	set_led_green(false);
 	set_led_blue(false);
@@ -178,33 +179,26 @@ int main(void)
 	ASSERT_OK(mic_start());
 
 	// Set LED
-	refresh_state_indication(true);
-
-	// Test
-	if (is_battery_charging())
-	{
-		printk("Battery is charging\n");
-	}
-	else
-	{
-		printk("Battery is not charging\n");
-	}
-	printk("Battery percentage: %d\n", get_battery_percentage());
+	is_charging = is_battery_charging();
+	refresh_state_indication();
 
 	// Main loop
 	ASSERT_OK(wdt_setup(wdt_dev, WDT_OPT_PAUSE_HALTED_BY_DBG));
-	bool tick = true;
 	while (1)
 	{
-		// Wait for second
-		k_msleep(1000);
-
-		// Refresh state indication
-		tick = !tick;
-		refresh_state_indication(tick);
+		// Wait wdt
+		k_msleep(WDT_FEED_MS);
 
 		// Watchdog
 		wdt_feed(wdt_dev, 0);
+
+		// Update battery state
+		bool charging = is_battery_charging();
+		if (charging != is_charging)
+		{
+			is_charging = charging;
+			refresh_state_indication();
+		}
 	}
 
 	// Unreachable

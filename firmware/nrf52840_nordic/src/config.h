@@ -1,7 +1,10 @@
 #include <haly/nrfy_gpio.h>
 
+// Watchdog
+#define WDT_TIMEOUT_MS 1000 // I want it to restart ASAP
+#define WDT_FEED_MS 200
+
 // #define SAMPLE_RATE 16000
-#define WDT_TIMEOUT_MS 4000 // Must be bigger than one second
 #define MIC_GAIN 80
 #define MIC_IRC_PRIORITY 7
 #define MIC_BUFFER_SAMPLES 1600    // 100ms

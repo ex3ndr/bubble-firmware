@@ -18,6 +18,7 @@
 static uint8_t battery_level = 100U;
 static bool battery_charging = false;
 static bool is_allowed = false;
+static uint16_t connected = 0;
 static struct transport_cb *external_callbacks = NULL;
 static struct bt_conn_cb _callback_references;
 static ssize_t audio_characteristic_read(struct bt_conn *conn, const struct bt_gatt_attr *attr, void *buf, uint16_t len, uint16_t offset);
@@ -130,7 +131,8 @@ static void ccc_config_changed_handler(const struct bt_gatt_attr *attr, uint16_t
     if (value == BT_GATT_CCC_NOTIFY)
     {
         printk("Client subscribed for notifications\n");
-        if (external_callbacks && external_callbacks->subscribed)
+        connected += 1;
+        if (connected == 1 && external_callbacks && external_callbacks->subscribed)
         {
             external_callbacks->subscribed();
         }
@@ -138,7 +140,8 @@ static void ccc_config_changed_handler(const struct bt_gatt_attr *attr, uint16_t
     else if (value == 0)
     {
         printk("Client unsubscribed from notifications\n");
-        if (external_callbacks && external_callbacks->unsubscribed)
+        connected -= 1;
+        if (connected == 0 && external_callbacks && external_callbacks->unsubscribed)
         {
             external_callbacks->unsubscribed();
         }

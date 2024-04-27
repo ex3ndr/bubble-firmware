@@ -138,6 +138,7 @@ int main(void)
 	wdt_config.window.max = WDT_TIMEOUT_MS;
 	wdt_config.callback = NULL; // Set to NULL to cause a system reset
 	ASSERT_OK(wdt_install_timeout(wdt_dev, &wdt_config));
+	ASSERT_OK(wdt_setup(wdt_dev, WDT_OPT_PAUSE_HALTED_BY_DBG));
 
 	// Led start
 	ASSERT_OK(led_start());
@@ -147,13 +148,16 @@ int main(void)
 #ifdef ENABLE_BUTTON
 	is_recording = settings_read_enable();
 #endif
+	ASSERT_OK(wdt_feed(wdt_dev, 0));
 
 	// Battery start
 	ASSERT_OK(battery_start());
+	ASSERT_OK(wdt_feed(wdt_dev, 0));
 
 	// Camera start
 #ifdef ENABLE_CAMERA
 	ASSERT_OK(camera_start());
+	ASSERT_OK(wdt_feed(wdt_dev, 0));
 #endif
 
 	// Transport start
@@ -162,16 +166,19 @@ int main(void)
 #ifndef ENABLE_BUTTON
 	set_allowed(true);
 #endif
+	ASSERT_OK(wdt_feed(wdt_dev, 0));
 
 	// Controls
 #ifdef ENABLE_BUTTON
 	set_button_handler(on_button_pressed);
 	ASSERT_OK(start_controls());
 #endif
+	ASSERT_OK(wdt_feed(wdt_dev, 0));
 
 	// Codec start
 	set_codec_callback(codec_handler);
 	ASSERT_OK(codec_start());
+	ASSERT_OK(wdt_feed(wdt_dev, 0));
 
 	// Mic start
 	set_mic_callback(mic_handler);
@@ -182,20 +189,21 @@ int main(void)
 		mic_resume();
 	}
 #endif
+	ASSERT_OK(wdt_feed(wdt_dev, 0));
 
 	// Set LED
 	is_charging = is_battery_charging();
 	refresh_state_indication();
+	ASSERT_OK(wdt_feed(wdt_dev, 0));
 
 	// Main loop
-	ASSERT_OK(wdt_setup(wdt_dev, WDT_OPT_PAUSE_HALTED_BY_DBG));
 	while (1)
 	{
 		// Wait wdt
 		k_msleep(WDT_FEED_MS);
 
 		// Watchdog
-		wdt_feed(wdt_dev, 0);
+		ASSERT_OK(wdt_feed(wdt_dev, 0));
 
 		// Update battery state
 		bool charging = is_battery_charging();

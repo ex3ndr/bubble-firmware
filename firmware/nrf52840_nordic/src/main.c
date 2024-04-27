@@ -14,10 +14,33 @@
 #include "settings.h"
 
 // State
+#ifdef ENABLE_BUTTON
+bool is_allowed = true;
+#else
+#define is_allowed true
+#endif
 bool is_recording = false;
 bool is_connected = false;
 bool is_charging = false;
 void refresh_state_indication();
+
+//
+// Mic State
+//
+
+static void update_mic_if_needed()
+{
+	if (is_allowed && is_connected && !is_recording)
+	{
+		is_recording = true;
+		mic_resume();
+	}
+	if ((!is_allowed || !is_connected) && is_recording)
+	{
+		is_recording = false;
+		mic_pause();
+	}
+}
 
 //
 // Transport callbacks
@@ -26,20 +49,14 @@ void refresh_state_indication();
 static void transport_subscribed()
 {
 	is_connected = true;
-#ifndef ENABLE_BUTTON
-	is_recording = true;
-	mic_resume();
-#endif
+	update_mic_if_needed();
 	refresh_state_indication();
 }
 
 static void transport_unsubscribed()
 {
 	is_connected = false;
-#ifndef ENABLE_BUTTON
-	is_recording = false;
-	mic_pause();
-#endif
+	update_mic_if_needed();
 	refresh_state_indication();
 }
 
@@ -55,17 +72,16 @@ static struct transport_cb transport_callbacks = {
 #ifdef ENABLE_BUTTON
 static void on_button_pressed()
 {
-	is_recording = !is_recording;
-	set_allowed(is_recording);
-	settings_write_enable(is_recording);
-	if (is_recording)
-	{
-		mic_resume();
-	}
-	else
-	{
-		mic_pause();
-	}
+	// Update allowed flag
+	is_allowed = !is_allowed;
+	set_allowed(is_allowed);
+	settings_write_enable(is_allowed);
+	printk("Mic allowed: %d\n", is_allowed);
+
+	// Update mic
+	update_mic_if_needed();
+
+	// Refresh LED
 	refresh_state_indication();
 }
 #endif
@@ -91,7 +107,7 @@ static void mic_handler(int16_t *buffer)
 void refresh_state_indication()
 {
 	// Recording and connected state - BLUE
-	if (is_recording && is_connected)
+	if (is_allowed && is_recording)
 	{
 		set_led_red(false);
 		set_led_green(false);
@@ -100,7 +116,7 @@ void refresh_state_indication()
 	}
 
 	// Recording but lost connection - RED
-	if (is_recording && !is_connected)
+	if (is_allowed && !is_recording)
 	{
 		set_led_red(true);
 		set_led_green(false);
@@ -146,7 +162,7 @@ int main(void)
 	// Settings start
 	ASSERT_OK(settings_start());
 #ifdef ENABLE_BUTTON
-	is_recording = settings_read_enable();
+	is_allowed = settings_read_enable();
 #endif
 	ASSERT_OK(wdt_feed(wdt_dev, 0));
 
@@ -163,9 +179,7 @@ int main(void)
 	// Transport start
 	set_transport_callbacks(&transport_callbacks);
 	ASSERT_OK(transport_start());
-#ifndef ENABLE_BUTTON
-	set_allowed(true);
-#endif
+	set_allowed(is_allowed);
 	ASSERT_OK(wdt_feed(wdt_dev, 0));
 
 	// Controls
@@ -183,12 +197,7 @@ int main(void)
 	// Mic start
 	set_mic_callback(mic_handler);
 	ASSERT_OK(mic_start());
-#ifdef ENABLE_BUTTON
-	if (is_recording)
-	{
-		mic_resume();
-	}
-#endif
+	update_mic_if_needed();
 	ASSERT_OK(wdt_feed(wdt_dev, 0));
 
 	// Set LED

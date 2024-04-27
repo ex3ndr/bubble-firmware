@@ -1,5 +1,8 @@
 #include <haly/nrfy_gpio.h>
 
+// Name
+#define DEVICE_NAME "Bubble"
+
 // Watchdog
 #define WDT_TIMEOUT_MS 1000 // I want it to restart ASAP
 #define WDT_FEED_MS 200

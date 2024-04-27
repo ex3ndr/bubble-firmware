@@ -80,7 +80,7 @@ static struct bt_gatt_service bas_service = BT_GATT_SERVICE(bas_attrs);
 
 static const struct bt_data bt_ad[] = {
     BT_DATA_BYTES(BT_DATA_FLAGS, (BT_LE_AD_GENERAL | BT_LE_AD_NO_BREDR)),
-    BT_DATA(BT_DATA_NAME_COMPLETE, "Super", sizeof("Super") - 1),
+    BT_DATA(BT_DATA_NAME_COMPLETE, DEVICE_NAME, sizeof(DEVICE_NAME) - 1),
 };
 
 //

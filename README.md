@@ -7,7 +7,11 @@ A universal firmware for open-source AI pendants. This firmware is compatible wi
 * 🔐 Privacy button to disable recording
 * 🔨 Configurable - you can configure it for your hardware
 
-## Releases
+## Changelog
+
+### Release v1.0.1
+
+Rebuilt the firmware and fixed device name.
 
 ### Release v1.0.0
 

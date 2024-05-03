@@ -227,6 +227,17 @@ static void _transport_connected(struct bt_conn *conn, uint8_t err)
         return;
     }
 
+    // Disconnect existing connection
+    if (current_connection)
+    {
+        if (bt_conn_disconnect(current_connection, BT_HCI_ERR_REMOTE_USER_TERM_CONN)) {
+            printk("Failed to disconnect existing connection\n");
+        }
+        bt_conn_unref(current_connection);
+        current_connection = NULL;
+        current_mtu = 0;
+    }
+
     // Save connection
     current_connection = bt_conn_ref(conn);
     current_mtu = info.le.data_len->tx_max_len;

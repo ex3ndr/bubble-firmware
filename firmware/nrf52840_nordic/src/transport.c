@@ -130,7 +130,7 @@ static void ccc_config_changed_handler(const struct bt_gatt_attr *attr, uint16_t
 {
     if (value == BT_GATT_CCC_NOTIFY)
     {
-        printk("Client subscribed for notifications\n");
+        printk("Client subscribed for audio stream\n");
         connected += 1;
         if (connected == 1 && external_callbacks && external_callbacks->subscribed)
         {
@@ -139,7 +139,7 @@ static void ccc_config_changed_handler(const struct bt_gatt_attr *attr, uint16_t
     }
     else if (value == 0)
     {
-        printk("Client unsubscribed from notifications\n");
+        printk("Client unsubscribed from audio stream\n");
         connected -= 1;
         if (connected == 0 && external_callbacks && external_callbacks->unsubscribed)
         {
@@ -188,6 +188,23 @@ static void mute_ccc_config_changed_handler(const struct bt_gatt_attr *attr, uin
 // Connection Callbacks
 //
 
+static const char *phy2str(uint8_t phy)
+{
+    switch (phy)
+    {
+    case 0:
+        return "No packets";
+    case BT_GAP_LE_PHY_1M:
+        return "LE 1M";
+    case BT_GAP_LE_PHY_2M:
+        return "LE 2M";
+    case BT_GAP_LE_PHY_CODED:
+        return "LE Coded";
+    default:
+        return "Unknown";
+    }
+}
+
 static void _transport_connected(struct bt_conn *conn, uint8_t err)
 {
     struct bt_conn_info info = {0};
@@ -198,11 +215,24 @@ static void _transport_connected(struct bt_conn *conn, uint8_t err)
         return;
     }
 
+    // Configure preferences
+    struct bt_conn_le_phy_param phy_param;
+    phy_param.options = BT_CONN_LE_PHY_OPT_NONE;
+    phy_param.pref_tx_phy = BT_GAP_LE_PHY_2M;
+    phy_param.pref_rx_phy = BT_GAP_LE_PHY_1M;
+    err = bt_conn_le_phy_update(conn, &phy_param);
+    if (err)
+    {
+        printk("PHY update request failed (err %d)\n", err);
+        return;
+    }
+
+    // Save connection
     current_connection = bt_conn_ref(conn);
     current_mtu = info.le.data_len->tx_max_len;
     printk("Connected\n");
     printk("Interval: %d, latency: %d, timeout: %d\n", info.le.interval, info.le.latency, info.le.timeout);
-    // printk("TX PHY %s, RX PHY %s\n", phy2str(info.le.phy->tx_phy), phy2str(info.le.phy->rx_phy));
+    printk("TX PHY %s, RX PHY %s\n", phy2str(info.le.phy->tx_phy), phy2str(info.le.phy->rx_phy));
     printk("LE data len updated: TX (len: %d time: %d) RX (len: %d time: %d)\n", info.le.data_len->tx_max_len, info.le.data_len->tx_max_time, info.le.data_len->rx_max_len, info.le.data_len->rx_max_time);
 }
 
@@ -235,8 +265,8 @@ static void _le_param_updated(struct bt_conn *conn, uint16_t interval,
 static void _le_phy_updated(struct bt_conn *conn,
                             struct bt_conn_le_phy_info *param)
 {
-    // printk("LE PHY updated: TX PHY %s, RX PHY %s\n",
-    //        phy2str(param->tx_phy), phy2str(param->rx_phy));
+    printk("LE PHY updated: TX PHY %s, RX PHY %s\n",
+           phy2str(param->tx_phy), phy2str(param->rx_phy));
 }
 
 static void _le_data_length_updated(struct bt_conn *conn,

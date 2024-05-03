@@ -1,0 +1,9 @@
+mainmenu "Bubble Firmware"
+
+config BUBBLE_SOFT_BUTTON
+    bool "Enable soft mute button"
+    default y
+    help
+        Enable or disable soft mute button
+
+source "Kconfig.zephyr"

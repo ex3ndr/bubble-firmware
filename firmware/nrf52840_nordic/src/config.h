@@ -5,7 +5,7 @@
 #define WDT_FEED_MS 200
 
 // #define SAMPLE_RATE 16000
-#define MIC_GAIN 80
+#define MIC_GAIN 70
 #define MIC_IRC_PRIORITY 7
 #define MIC_BUFFER_SAMPLES 1600    // 100ms
 #define AUDIO_BUFFER_SAMPLES 16000 // 1s
@@ -22,12 +22,18 @@
 // #define ENABLE_CAMERA 1
 
 // Button
+#if defined(CONFIG_BUBBLE_SOFT_BUTTON)
 #define ENABLE_BUTTON 1
+#endif
 
 // Codecs
-// #define CODEC_PCM 1
-// #define CODEC_MU_LAW 1
+#if defined(CONFIG_BUBBLE_CODEC_PCM)
+#define CODEC_PCM 1
+#elif defined(CONFIG_BUBBLE_CODEC_MULAW)
+#define CODEC_MU_LAW 1
+#elif defined(CONFIG_BUBBLE_CODEC_OPUS)
 #define CODEC_OPUS 1
+#endif
 
 // Codec packages
 #if CODEC_PCM | CODEC_MU_LAW

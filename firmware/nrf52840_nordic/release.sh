@@ -27,8 +27,8 @@ done
 # Copy
 mkdir -p release/firmware
 cp -r release/bubble_pcm/zephyr/zephyr.uf2 release/firmware/bubble_pcm.uf2
-cp -r release/bubble_mulaw/zephyr/zephyr.bin release/firmware/bubble_mulaw.uf2
+cp -r release/bubble_mulaw/zephyr/zephyr.uf2 release/firmware/bubble_mulaw.uf2
 cp -r release/bubble_opus/zephyr/zephyr.uf2 release/firmware/bubble_opus.uf2
 cp -r release/friend_pcm/zephyr/zephyr.uf2 release/firmware/friend_pcm.uf2
-cp -r release/friend_mulaw/zephyr/zephyr.bin release/firmware/friend_mulaw.uf2
+cp -r release/friend_mulaw/zephyr/zephyr.uf2 release/firmware/friend_mulaw.uf2
 cp -r release/friend_opus/zephyr/zephyr.uf2 release/firmware/friend_opus.uf2

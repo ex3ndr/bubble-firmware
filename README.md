@@ -9,6 +9,10 @@ A universal firmware for open-source AI pendants. This firmware is compatible wi
 
 ## Changelog
 
+### Release v1.5.1
+
+* 🐛 Rebuilt the firmware using stable sdk
+
 ### Release v1.5.0
 
 * 🚀 Dramatically increased TX power to improve range.

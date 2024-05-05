@@ -16,6 +16,9 @@ target_sources(app PRIVATE
     src/controls.c
     src/battery.c
     src/settings.c
+)
+
+target_sources_ifdef(CONFIG_BUBBLE_CODEC_OPUS app PRIVATE
     src/opus-1.2.1/A2NLSF.c
     src/opus-1.2.1/CNG.c
     src/opus-1.2.1/HP_variable_cutoff.c

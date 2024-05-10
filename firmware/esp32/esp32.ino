@@ -1,5 +1,7 @@
 #define CAMERA_MODEL_XIAO_ESP32S3
 #include <I2S.h>
+// #include "FS.h"
+// #include "SD.h"
 #include <BLE2902.h>
 #include <BLEDevice.h>
 #include <BLEUtils.h>
@@ -107,6 +109,23 @@ void configure_ble() {
 // }
 
 camera_fb_t *fb;
+// int images_written = 0;
+
+// void writeFile(fs::FS &fs, const char * path, uint8_t * data, size_t len){
+//     Serial.printf("Writing file: %s\n", path);
+
+//     File file = fs.open(path, FILE_WRITE);
+//     if(!file){
+//         Serial.println("Failed to open file for writing");
+//         return;
+//     }
+//     if(file.write(data, len) == len){
+//         Serial.println("File written");
+//     } else {
+//         Serial.println("Write failed");
+//     }
+//     file.close();
+// }
 
 bool take_photo() {
 
@@ -123,6 +142,13 @@ bool take_photo() {
     Serial.println("Failed to get camera frame buffer");
     return false;
   }
+
+  // Write to SD
+  // char filename[32];
+  // sprintf(filename, "/image_%d.jpg", images_written);
+  // writeFile(SD, filename, fb->buf, fb->len);
+  // images_written++;
+
   return true;
 }
 
@@ -136,6 +162,7 @@ static size_t recording_buffer_size = 400;
 static size_t compressed_buffer_size = 400 + 3; /* header */
 static uint8_t *s_recording_buffer = nullptr;
 static uint8_t *s_compressed_frame = nullptr;
+static uint8_t *s_compressed_frame_2 = nullptr;
 
 void configure_microphone() {
 
@@ -149,6 +176,7 @@ void configure_microphone() {
   // Allocate buffers
   s_recording_buffer = (uint8_t *) ps_calloc(recording_buffer_size, sizeof(uint8_t));
   s_compressed_frame = (uint8_t *) ps_calloc(compressed_buffer_size, sizeof(uint8_t));
+  s_compressed_frame_2 = (uint8_t *) ps_calloc(compressed_buffer_size, sizeof(uint8_t));
 }
 
 size_t read_microphone() {
@@ -211,7 +239,8 @@ void configure_camera() {
 //
 
 void setup() {
-  Serial.begin(115200);
+  Serial.begin(921600);
+  // SD.begin(21);
   Serial.println("Setup");
   Serial.println("Starting BLE...");
   configure_ble();
@@ -264,16 +293,16 @@ void loop() {
     size_t remaining = fb->len - sent_photo_bytes;
     if (remaining > 0) {
       // Populate buffer
-      s_compressed_frame[0] = sent_photo_frames & 0xFF;
-      s_compressed_frame[1] = (sent_photo_frames >> 8) & 0xFF;
+      s_compressed_frame_2[0] = sent_photo_frames & 0xFF;
+      s_compressed_frame_2[1] = (sent_photo_frames >> 8) & 0xFF;
       size_t bytes_to_copy = remaining;
       if (bytes_to_copy > 200) {
         bytes_to_copy = 200;
       }
-      memcpy(&s_compressed_frame[3], &fb->buf[sent_photo_bytes], bytes_to_copy);
+      memcpy(&s_compressed_frame_2[2], &fb->buf[sent_photo_bytes], bytes_to_copy);
       
       // Push to BLE
-      photo->setValue(s_compressed_frame, bytes_to_copy + 2);
+      photo->setValue(s_compressed_frame_2, bytes_to_copy + 2);
       photo->notify();
       sent_photo_bytes += bytes_to_copy;
       sent_photo_frames++;

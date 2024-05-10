@@ -16,22 +16,25 @@
 static BLEUUID serviceUUID("19B10000-E8F2-537E-4F6C-D104768A1214");
 static BLEUUID audioCharUUID("19B10001-E8F2-537E-4F6C-D104768A1214");
 static BLEUUID audioCodecUUID("19B10002-E8F2-537E-4F6C-D104768A1214");
+static BLEUUID photoCharUUID("19B10005-E8F2-537E-4F6C-D104768A1214");
 
 BLECharacteristic *audio;
+BLECharacteristic *photo;
+bool connected = false;
 
 class ServerHandler: public BLEServerCallbacks
 {
   void onConnect(BLEServer *server)
   {
-    // s_is_connected = true;
-    // Serial.println("Connected");
+    connected = true;
+    Serial.println("Connected");
   }
 
   void onDisconnect(BLEServer *server)
   {
-    // s_is_connected = false;
-    // Serial.println("Disconnected");
-    // BLEDevice::startAdvertising();
+    connected = false;
+    Serial.println("Disconnected");
+    BLEDevice::startAdvertising();
   }
 };
 
@@ -56,7 +59,15 @@ void configure_ble() {
   BLE2902 *ccc = new BLE2902();
   ccc->setNotifications(true);
   audio->addDescriptor(ccc);
-  // audio->setCallbacks(new MessageHandler());
+
+  // Photo service
+  photo = service->createCharacteristic(
+    photoCharUUID,
+    BLECharacteristic::PROPERTY_READ | BLECharacteristic::PROPERTY_NOTIFY
+  );
+  ccc = new BLE2902();
+  ccc->setNotifications(true);
+  photo->addDescriptor(ccc);
 
   // Codec service
   BLECharacteristic *codec = service->createCharacteristic(
@@ -78,16 +89,6 @@ void configure_ble() {
   BLEDevice::startAdvertising();
 }
 
-void push_ble_audio() {
-  // uint32_t available_samples = (recording_idx + BUFFER_RING - read_idx) % BUFFER_RING;
-  // if (available_samples >= PACKET_SAMPLES) {
-  //   for (int i = 0; i < PACKET_SAMPLES; i++) {
-  //     codec_output_buffer[i] = linear2ulaw(recording_buf[(read_idx + i) % BUFFER_RING] * SCALE);
-  //   }
-  //   read_idx = (read_idx + PACKET_SAMPLES) % BUFFER_RING;
-  //   audioCharacteristic.writeValue(codec_output_buffer, PACKET_SAMPLES);
-}
-
 // Save pictures to SD card
 // void photo_share(const char * fileName) {
 //   // Take a photo
@@ -105,12 +106,34 @@ void push_ble_audio() {
 //   Serial.println("Photo saved to file");
 // }
 
+camera_fb_t *fb;
+
+bool take_photo() {
+
+  // Release buffer
+  if (fb) {
+    Serial.println("Release FB");
+    esp_camera_fb_return(fb);
+  }
+
+  // Take a photo
+  Serial.println("Taking photo...");
+  fb = esp_camera_fb_get();
+  if (!fb) {
+    Serial.println("Failed to get camera frame buffer");
+    return false;
+  }
+  return true;
+}
+
 //
 // Microphone
 //
 
+#define VOLUME_GAIN 2
+
 static size_t recording_buffer_size = 400;
-static size_t compressed_buffer_size = 200 + 3; /* header */
+static size_t compressed_buffer_size = 400 + 3; /* header */
 static uint8_t *s_recording_buffer = nullptr;
 static uint8_t *s_compressed_frame = nullptr;
 
@@ -169,9 +192,9 @@ void configure_camera() {
   // config.grab_mode = CAMERA_GRAB_LATEST;
 
   // Low quality (and in local ram)
-  config.jpeg_quality = 12;
+  config.jpeg_quality = 10;
   config.frame_size = FRAMESIZE_SVGA;
-  config.grab_mode = CAMERA_GRAB_WHEN_EMPTY;
+  config.grab_mode = CAMERA_GRAB_LATEST;
   config.fb_location = CAMERA_FB_IN_PSRAM;
   // config.fb_location = CAMERA_FB_IN_DRAM;
 
@@ -189,6 +212,7 @@ void configure_camera() {
 
 void setup() {
   Serial.begin(115200);
+  Serial.println("Setup");
   Serial.println("Starting BLE...");
   configure_ble();
   Serial.println("Starting Microphone...");
@@ -199,6 +223,10 @@ void setup() {
 }
 
 uint16_t frame_count = 0;
+unsigned long lastCaptureTime = 0;
+size_t sent_photo_bytes = 0;
+size_t sent_photo_frames = 0;
+bool need_send_photo = false;
 
 void loop() {
 
@@ -206,35 +234,55 @@ void loop() {
   size_t bytes_recorded = read_microphone();
 
   // Push to BLE
-  if (bytes_recorded > 0) {
-    size_t mulaw_buffer_size = bytes_recorded / 2 + 3;
+  if (bytes_recorded > 0 && connected) {
+    size_t out_buffer_size = bytes_recorded / 2 + 3;
     for (size_t i = 0; i < bytes_recorded; i += 2) {
-      int16_t sample = (s_recording_buffer[i + 1] << 8) | s_recording_buffer[i];
+      int16_t sample = ((s_recording_buffer[i + 1] << 8) | s_recording_buffer[i]) << VOLUME_GAIN;
       s_compressed_frame[i / 2 + 3] = linear2ulaw(sample);
     }
     s_compressed_frame[0] = frame_count & 0xFF;
     s_compressed_frame[1] = (frame_count >> 8) & 0xFF;
     s_compressed_frame[2] = 0;
-    audio->setValue(s_compressed_frame, mulaw_buffer_size);
+    audio->setValue(s_compressed_frame, out_buffer_size);
     audio->notify();
     frame_count++;
   }
 
-  // // Camera & SD available, start taking pictures
-  // if(camera_sign && sd_sign){
-  //   // Get the current time
-  //   unsigned long now = millis();
-  
-  //   //If it has been more than 1 minute since the last shot, take a picture and save it to the SD card
-  //   if ((now - lastCaptureTime) >= 60000) {
-  //     char filename[32];
-  //     sprintf(filename, "/image%d.jpg", imageCount);
-  //     photo_save(filename);
-  //     Serial.printf("Saved picture: %s\r\n", filename);
-  //     Serial.println("Photos will begin in one minute, please be ready.");
-  //     imageCount++;
-  //     lastCaptureTime = now;
-  //   }
-  // }
-  delay(4);
+  // Take a photo
+  unsigned long now = millis();
+  if ((now - lastCaptureTime) >= 5000 && !need_send_photo && connected) {
+    if (take_photo()) {
+      need_send_photo = true;
+      sent_photo_bytes = 0;
+      sent_photo_frames = 0;
+      lastCaptureTime = now;
+    }
+  }
+
+  // Push to BLE
+  if (need_send_photo) {
+    size_t remaining = fb->len - sent_photo_bytes;
+    if (remaining > 0) {
+      // Populate buffer
+      s_compressed_frame[0] = sent_photo_frames & 0xFF;
+      s_compressed_frame[1] = (sent_photo_frames >> 8) & 0xFF;
+      size_t bytes_to_copy = remaining;
+      if (bytes_to_copy > 200) {
+        bytes_to_copy = 200;
+      }
+      memcpy(&s_compressed_frame[3], &fb->buf[sent_photo_bytes], bytes_to_copy);
+      
+      // Push to BLE
+      photo->setValue(s_compressed_frame, bytes_to_copy + 2);
+      photo->notify();
+      sent_photo_bytes += bytes_to_copy;
+      sent_photo_frames++;
+    } else {
+      Serial.println("Photo sent");
+      need_send_photo = false;
+    }
+  }
+
+  // Delay
+  delay(2);
 }

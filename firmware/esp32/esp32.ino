@@ -156,34 +156,34 @@ bool take_photo() {
 // Microphone
 //
 
-#define VOLUME_GAIN 2
+// #define VOLUME_GAIN 2
 
-static size_t recording_buffer_size = 400;
-static size_t compressed_buffer_size = 400 + 3; /* header */
-static uint8_t *s_recording_buffer = nullptr;
-static uint8_t *s_compressed_frame = nullptr;
-static uint8_t *s_compressed_frame_2 = nullptr;
+// static size_t recording_buffer_size = 400;
+// static size_t compressed_buffer_size = 400 + 3; /* header */
+// static uint8_t *s_recording_buffer = nullptr;
+// static uint8_t *s_compressed_frame = nullptr;
+// static uint8_t *s_compressed_frame_2 = nullptr;
 
-void configure_microphone() {
+// void configure_microphone() {
 
-  // start I2S at 16 kHz with 16-bits per sample
-  I2S.setAllPins(-1, 42, 41, -1, -1);
-  if (!I2S.begin(PDM_MONO_MODE, 8000, 16)) {
-    Serial.println("Failed to initialize I2S!");
-    while (1); // do nothing
-  }
+//   // start I2S at 16 kHz with 16-bits per sample
+//   I2S.setAllPins(-1, 42, 41, -1, -1);
+//   if (!I2S.begin(PDM_MONO_MODE, 8000, 16)) {
+//     Serial.println("Failed to initialize I2S!");
+//     while (1); // do nothing
+//   }
 
-  // Allocate buffers
-  s_recording_buffer = (uint8_t *) ps_calloc(recording_buffer_size, sizeof(uint8_t));
-  s_compressed_frame = (uint8_t *) ps_calloc(compressed_buffer_size, sizeof(uint8_t));
-  s_compressed_frame_2 = (uint8_t *) ps_calloc(compressed_buffer_size, sizeof(uint8_t));
-}
+//   // Allocate buffers
+//   s_recording_buffer = (uint8_t *) ps_calloc(recording_buffer_size, sizeof(uint8_t));
+//   s_compressed_frame = (uint8_t *) ps_calloc(compressed_buffer_size, sizeof(uint8_t));
+//   s_compressed_frame_2 = (uint8_t *) ps_calloc(compressed_buffer_size, sizeof(uint8_t));
+// }
 
-size_t read_microphone() {
-  size_t bytes_recorded = 0;
-  esp_i2s::i2s_read(esp_i2s::I2S_NUM_0, s_recording_buffer, recording_buffer_size, &bytes_recorded, portMAX_DELAY);
-  return bytes_recorded;
-}
+// size_t read_microphone() {
+//   size_t bytes_recorded = 0;
+//   esp_i2s::i2s_read(esp_i2s::I2S_NUM_0, s_recording_buffer, recording_buffer_size, &bytes_recorded, portMAX_DELAY);
+//   return bytes_recorded;
+// }
 
 //
 // Camera
@@ -238,20 +238,23 @@ void configure_camera() {
 // Main
 //
 
+static uint8_t *s_compressed_frame_2 = nullptr;
+static size_t compressed_buffer_size = 400 + 3;
 void setup() {
   Serial.begin(921600);
   // SD.begin(21);
   Serial.println("Setup");
   Serial.println("Starting BLE...");
   configure_ble();
-  Serial.println("Starting Microphone...");
-  configure_microphone();
+  s_compressed_frame_2 = (uint8_t *) ps_calloc(compressed_buffer_size, sizeof(uint8_t));
+  // Serial.println("Starting Microphone...");
+  // configure_microphone();
   Serial.println("Starting Camera...");
   configure_camera();
   Serial.println("OK");
 }
 
-uint16_t frame_count = 0;
+// uint16_t frame_count = 0;
 unsigned long lastCaptureTime = 0;
 size_t sent_photo_bytes = 0;
 size_t sent_photo_frames = 0;
@@ -259,23 +262,23 @@ bool need_send_photo = false;
 
 void loop() {
 
-  // Read from mic
-  size_t bytes_recorded = read_microphone();
+  // // Read from mic
+  // size_t bytes_recorded = read_microphone();
 
-  // Push to BLE
-  if (bytes_recorded > 0 && connected) {
-    size_t out_buffer_size = bytes_recorded / 2 + 3;
-    for (size_t i = 0; i < bytes_recorded; i += 2) {
-      int16_t sample = ((s_recording_buffer[i + 1] << 8) | s_recording_buffer[i]) << VOLUME_GAIN;
-      s_compressed_frame[i / 2 + 3] = linear2ulaw(sample);
-    }
-    s_compressed_frame[0] = frame_count & 0xFF;
-    s_compressed_frame[1] = (frame_count >> 8) & 0xFF;
-    s_compressed_frame[2] = 0;
-    audio->setValue(s_compressed_frame, out_buffer_size);
-    audio->notify();
-    frame_count++;
-  }
+  // // Push to BLE
+  // if (bytes_recorded > 0 && connected) {
+  //   size_t out_buffer_size = bytes_recorded / 2 + 3;
+  //   for (size_t i = 0; i < bytes_recorded; i += 2) {
+  //     int16_t sample = ((s_recording_buffer[i + 1] << 8) | s_recording_buffer[i]) << VOLUME_GAIN;
+  //     s_compressed_frame[i / 2 + 3] = linear2ulaw(sample);
+  //   }
+  //   s_compressed_frame[0] = frame_count & 0xFF;
+  //   s_compressed_frame[1] = (frame_count >> 8) & 0xFF;
+  //   s_compressed_frame[2] = 0;
+  //   audio->setValue(s_compressed_frame, out_buffer_size);
+  //   audio->notify();
+  //   frame_count++;
+  // }
 
   // Take a photo
   unsigned long now = millis();
@@ -307,11 +310,18 @@ void loop() {
       sent_photo_bytes += bytes_to_copy;
       sent_photo_frames++;
     } else {
+
+      // End flag
+      s_compressed_frame_2[0] = 0xFF;
+      s_compressed_frame_2[1] = 0xFF;
+      photo->setValue(s_compressed_frame_2, 2);
+      photo->notify();
+
       Serial.println("Photo sent");
       need_send_photo = false;
     }
   }
 
   // Delay
-  delay(2);
+  delay(4);
 }
